@@ -4,8 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
 import logoUrl from '@/assets/logo.png'
+import { userLogout } from '@/api/usersController'
 import type { GlobalMenuItem } from '@/config/navigation'
+import { useLoginUserStore } from '@/stores/loginUserStore'
 
+const loginUserStore = useLoginUserStore()
 const props = defineProps<{
   menuItems: GlobalMenuItem[]
 }>()
@@ -13,7 +16,10 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 
-const username = 'Jingtao Liu'
+const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser?.id))
+const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
+const username = computed(() => loginUserStore.loginUser?.userName || 'User')
+const userAvatar = computed(() => loginUserStore.loginUser?.userAvatar || '')
 
 const selectedKeys = computed(() => {
   const activeItem = props.menuItems.find((item) => {
@@ -34,13 +40,37 @@ const handleMenuClick = ({ key }: { key: string }) => {
   }
 }
 
-const handleUserMenuClick = ({ key }: { key: string }) => {
+const handleUserMenuClick = async ({ key }: { key: string }) => {
+  if (key === 'userManagement') {
+    await router.push('/admin/userManagement')
+    return
+  }
+
   if (key === 'logout') {
-    message.success('已退出登录（示例）')
+    try {
+      const res = await userLogout()
+      if (res.data.code === 0) {
+        loginUserStore.setLoginUser({})
+        message.success('已退出登录')
+        await router.replace('/')
+        return
+      }
+      message.error(res.data.message || '退出登录失败，请稍后重试')
+    } catch {
+      message.error('退出登录失败，请稍后重试')
+    }
     return
   }
 
   message.info('该功能正在开发中')
+}
+
+const goToLoginPage = () => {
+  void router.push('/user/login')
+}
+
+const goToRegisterPage = () => {
+  void router.push('/user/register')
 }
 </script>
 
@@ -62,14 +92,17 @@ const handleUserMenuClick = ({ key }: { key: string }) => {
         />
       </div>
 
-      <a-dropdown :trigger="['click']">
+      <a-dropdown v-if="isLoggedIn" :trigger="['click']">
         <button type="button" class="global-header__user-trigger">
-          <a-avatar :size="40" class="global-header__avatar">JL</a-avatar>
+          <a-avatar :size="40" :src="userAvatar" class="global-header__avatar">
+            {{ username.slice(0, 1).toUpperCase() }}
+          </a-avatar>
           <span class="global-header__username">{{ username }}</span>
           <span class="global-header__caret">▾</span>
         </button>
         <template #overlay>
           <a-menu @click="handleUserMenuClick">
+            <a-menu-item v-if="isAdmin" key="userManagement">用户管理</a-menu-item>
             <a-menu-item key="profile">个人中心</a-menu-item>
             <a-menu-item key="settings">账号设置</a-menu-item>
             <a-menu-divider />
@@ -77,6 +110,11 @@ const handleUserMenuClick = ({ key }: { key: string }) => {
           </a-menu>
         </template>
       </a-dropdown>
+
+      <div v-else class="global-header__auth-actions">
+        <a-button @click="goToRegisterPage">注册</a-button>
+        <a-button type="primary" @click="goToLoginPage">登录</a-button>
+      </div>
     </div>
   </a-layout-header>
 </template>
@@ -162,6 +200,12 @@ const handleUserMenuClick = ({ key }: { key: string }) => {
   opacity: 0.9;
 }
 
+.global-header__auth-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 @media (max-width: 900px) {
   .global-header {
     padding: 0 16px;
@@ -189,6 +233,10 @@ const handleUserMenuClick = ({ key }: { key: string }) => {
   }
 
   .global-header__user-trigger {
+    margin-left: auto;
+  }
+
+  .global-header__auth-actions {
     margin-left: auto;
   }
 

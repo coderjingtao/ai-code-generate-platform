@@ -54,6 +54,9 @@ import { globalMenuItems } from '@/config/navigation'
 
 .basic-layout__content-inner {
   width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
   padding: 24px;
 }
 

@@ -9,6 +9,21 @@ const router = createRouter({
       component: () => import('@/views/HomeView.vue'),
     },
     {
+      path: '/user/login',
+      name: 'user login',
+      component: () => import('@/views/user/UserLoginView.vue'),
+    },
+    {
+      path: '/user/register',
+      name: 'user register',
+      component: () => import('@/views/user/UserRegisterView.vue'),
+    },
+    {
+      path: '/admin/userManagement',
+      name: 'user management',
+      component: () => import('@/views/admin/UserManagementView.vue'),
+    },
+    {
       path: '/workspace',
       name: 'workspace',
       component: () => import('@/views/WorkspaceView.vue'),
