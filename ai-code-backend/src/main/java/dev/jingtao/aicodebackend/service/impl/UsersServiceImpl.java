@@ -60,7 +60,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
         Users user = new Users();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
-        user.setUserName("Joseph");
+        user.setUserName(userAccount);
         user.setUserRole(UserRoleEnum.USER.getValue());
         boolean saveResult = this.save(user);
         if (!saveResult) {
