@@ -3,6 +3,7 @@ package dev.jingtao.aicodebackend.ai;
 import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
 import dev.langchain4j.service.SystemMessage;
+import reactor.core.publisher.Flux;
 
 public interface AiCodeGenerateService {
 
@@ -13,4 +14,10 @@ public interface AiCodeGenerateService {
 
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
     MultiFileCodeResult generateMultiFileCode(String userPrompt);
+
+    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    Flux<String> generateHtmlCodeStream(String userPrompt);
+
+    @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
+    Flux<String> generateMultiFileCodeStream(String userPrompt);
 }

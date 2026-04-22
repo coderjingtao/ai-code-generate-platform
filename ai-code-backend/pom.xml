@@ -107,6 +107,13 @@
             <version>1.13.0-beta23</version>
         </dependency>
 
+        <!-- LangChain Streaming of Flux -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-reactor</artifactId>
+            <version>1.13.0-beta23</version>
+        </dependency>
+
     </dependencies>
 
     <build>
