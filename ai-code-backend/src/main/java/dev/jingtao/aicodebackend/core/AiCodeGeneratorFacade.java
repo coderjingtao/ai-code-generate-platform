@@ -3,6 +3,8 @@ package dev.jingtao.aicodebackend.core;
 import dev.jingtao.aicodebackend.ai.AiCodeGenerateService;
 import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
+import dev.jingtao.aicodebackend.core.parser.CodeParserExecutor;
+import dev.jingtao.aicodebackend.core.saver.CodeFileSaverExecutor;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
@@ -21,75 +23,64 @@ public class AiCodeGeneratorFacade {
     @Resource
     private AiCodeGenerateService aiCodeGenerateService;
 
+    /**
+     * 统一入口：根据代码生成的类型，生成代码并保存到文件
+     * @param userPrompt 用户提示词
+     * @param codeGenTypeEnum 代码生成类型
+     * @return 文件保存的目录
+     */
     public File generateAndSaveCode(String userPrompt, CodeGenTypeEnum codeGenTypeEnum) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         return switch (codeGenTypeEnum){
-            case HTML -> generateAndSaveHtmlCode(userPrompt);
-            case MULTI_FILE -> generateAndSaveMultiFileCode(userPrompt);
+            case HTML -> {
+                HtmlCodeResult result = aiCodeGenerateService.generateHtmlCode(userPrompt);
+                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum);
+            }
+            case MULTI_FILE -> {
+                MultiFileCodeResult result = aiCodeGenerateService.generateMultiFileCode(userPrompt);
+                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum);
+            }
+            default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
         };
     }
 
+    /**
+     * 统一入口：根据代码生成的类型，生成代码并保存到文件（流式）
+     * @param userPrompt 用户提示词
+     * @param codeGenTypeEnum 代码生成类型
+     * @return 生成代码的实时流式字符串
+     */
     public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         return switch (codeGenTypeEnum){
-            case HTML -> generateAndSaveHtmlCodeStream(userPrompt);
-            case MULTI_FILE -> generateAndSaveMultiFileCodeStream(userPrompt);
+            case HTML -> {
+                Flux<String> codeStream = aiCodeGenerateService.generateHtmlCodeStream(userPrompt);
+                yield processCodeStream(codeStream, codeGenTypeEnum);
+            }
+            case MULTI_FILE -> {
+                Flux<String> codeStream = aiCodeGenerateService.generateMultiFileCodeStream(userPrompt);
+                yield processCodeStream(codeStream, codeGenTypeEnum);
+            }
+            default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
         };
     }
 
-    /**
-     * 根据用户提示词，生成HTML模式的代码并保存
-     * @param userPrompt 用户提示词
-     * @return 代码保存的目录
-     */
-    private File generateAndSaveHtmlCode(String userPrompt){
-        HtmlCodeResult htmlCodeResult = aiCodeGenerateService.generateHtmlCode(userPrompt);
-        return CodeFileSaver.saveHtmlCodeResult(htmlCodeResult);
-    }
-
-    /**
-     * 根据用户提示词，生成多文件模式的代码并保存
-     * @param userPrompt 用户提示词
-     * @return 代码保存的目录
-     */
-    private File generateAndSaveMultiFileCode(String userPrompt){
-        MultiFileCodeResult multiFileCodeResult = aiCodeGenerateService.generateMultiFileCode(userPrompt);
-        return CodeFileSaver.saveMultiFileCodeResult(multiFileCodeResult);
-    }
-
-    private Flux<String> generateAndSaveHtmlCodeStream(String userPrompt){
-        Flux<String> result = aiCodeGenerateService.generateHtmlCodeStream(userPrompt);
-        // 当流式返回生成代码完成后，再保存代码
+    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType){
         StringBuilder codeBuilder = new StringBuilder();
-        return result
+        return codeStream
+                //实时收集代码片段
                 .doOnNext(codeBuilder::append)
-                .doOnComplete(() -> {
-                    // 流式返回完成后保存代码
-                    try{
-                        String htmlCode = codeBuilder.toString();
-                        HtmlCodeResult htmlCodeResult = CodeParser.parseHtmlCode(htmlCode);
-                        //保存代码到文件
-                        File savedDir = CodeFileSaver.saveHtmlCodeResult(htmlCodeResult);
-                        log.info("HTML saved successfully: {}", savedDir.getAbsolutePath());
-                    } catch (Exception e) {
-                        log.error("Error saving HTML code: {}", e.getMessage());
-                    }
-                });
-    }
-
-    private Flux<String> generateAndSaveMultiFileCodeStream(String userPrompt){
-        Flux<String> result = aiCodeGenerateService.generateMultiFileCodeStream(userPrompt);
-        StringBuilder codeBuilder = new StringBuilder();
-        return result
-                .doOnNext(codeBuilder::append)
+                //流式返回完成后保存代码
                 .doOnComplete(() -> {
                     try{
-                        String multiFileCode = codeBuilder.toString();
-                        MultiFileCodeResult multiFileCodeResult = CodeParser.parseMultiFileCode(multiFileCode);
-                        File savedDir = CodeFileSaver.saveMultiFileCodeResult(multiFileCodeResult);
-                        log.info("Multi-file saved successfully: {}", savedDir.getAbsolutePath());
+                        String completedCode = codeBuilder.toString();
+                        //使用执行器解析代码
+                        Object parsedResult = CodeParserExecutor.executeParser(completedCode,codeGenType);
+                        //使用执行器保存代码
+                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult,codeGenType);
+                        log.info("{} mode files saved successfully: {}", codeGenType, savedDir.getAbsolutePath());
                     } catch (Exception e) {
-                        log.error("Error saving multi-file code: {}", e.getMessage());
+                        log.error("{} mode file saved failed, error: {}", codeGenType, e.getMessage());
                     }
                 });
     }
