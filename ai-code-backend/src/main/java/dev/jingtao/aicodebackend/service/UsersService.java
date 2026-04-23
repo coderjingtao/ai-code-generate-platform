@@ -2,7 +2,7 @@ package dev.jingtao.aicodebackend.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
-import dev.jingtao.aicodebackend.model.dto.UserQueryRequest;
+import dev.jingtao.aicodebackend.model.dto.user.UserQueryRequest;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.vo.LoginUserVO;
 import dev.jingtao.aicodebackend.model.vo.UserVO;

@@ -10,7 +10,7 @@ import dev.jingtao.aicodebackend.constant.UserConstant;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
-import dev.jingtao.aicodebackend.model.dto.*;
+import dev.jingtao.aicodebackend.model.dto.user.*;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.vo.LoginUserVO;
 import dev.jingtao.aicodebackend.model.vo.UserVO;

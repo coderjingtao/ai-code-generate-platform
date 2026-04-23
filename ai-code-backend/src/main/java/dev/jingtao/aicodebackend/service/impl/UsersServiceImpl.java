@@ -8,7 +8,7 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.mapper.UsersMapper;
-import dev.jingtao.aicodebackend.model.dto.UserQueryRequest;
+import dev.jingtao.aicodebackend.model.dto.user.UserQueryRequest;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.enums.UserRoleEnum;
 import dev.jingtao.aicodebackend.model.vo.LoginUserVO;

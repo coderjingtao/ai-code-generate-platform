@@ -1,4 +1,4 @@
-package dev.jingtao.aicodebackend.model.dto;
+package dev.jingtao.aicodebackend.model.dto.user;
 
 import lombok.Data;
 
