@@ -3,6 +3,7 @@ package dev.jingtao.aicodebackend.core.saver;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
@@ -17,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 public abstract class CodeFileSaverTemplate<T> {
 
     // 文件保存的根目录
-    private static final String FILE_SAVE_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
+    private static final String FILE_SAVE_ROOT_DIR = AppConstant.CODE_OUTPUT_ROOT_DIR;
 
     /**
      * 模版方法：保存代码到文件的标准流程
