@@ -18,14 +18,14 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generateAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generateAndSaveCode("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE);
+        File file = aiCodeGeneratorFacade.generateAndSaveCode("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE,111L);
         System.out.println(file.getAbsolutePath());
         Assertions.assertNotNull(file);
     }
 
     @Test
     void generateAndSaveCodeStream(){
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE,112L);
         //阻塞等待所有数据收集完成
         List<String> result = codeStream.collectList().block();
         Assertions.assertNotNull(result);

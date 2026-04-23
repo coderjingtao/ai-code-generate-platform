@@ -29,16 +29,16 @@ public class AiCodeGeneratorFacade {
      * @param codeGenTypeEnum 代码生成类型
      * @return 文件保存的目录
      */
-    public File generateAndSaveCode(String userPrompt, CodeGenTypeEnum codeGenTypeEnum) {
+    public File generateAndSaveCode(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         return switch (codeGenTypeEnum){
             case HTML -> {
                 HtmlCodeResult result = aiCodeGenerateService.generateHtmlCode(userPrompt);
-                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum);
+                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
                 MultiFileCodeResult result = aiCodeGenerateService.generateMultiFileCode(userPrompt);
-                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum);
+                yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum, appId);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
         };
@@ -50,22 +50,22 @@ public class AiCodeGeneratorFacade {
      * @param codeGenTypeEnum 代码生成类型
      * @return 生成代码的实时流式字符串
      */
-    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum){
+    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         return switch (codeGenTypeEnum){
             case HTML -> {
                 Flux<String> codeStream = aiCodeGenerateService.generateHtmlCodeStream(userPrompt);
-                yield processCodeStream(codeStream, codeGenTypeEnum);
+                yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
                 Flux<String> codeStream = aiCodeGenerateService.generateMultiFileCodeStream(userPrompt);
-                yield processCodeStream(codeStream, codeGenTypeEnum);
+                yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
         };
     }
 
-    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType){
+    private Flux<String> processCodeStream(Flux<String> codeStream, CodeGenTypeEnum codeGenType, Long appId){
         StringBuilder codeBuilder = new StringBuilder();
         return codeStream
                 //实时收集代码片段
@@ -77,10 +77,10 @@ public class AiCodeGeneratorFacade {
                         //使用执行器解析代码
                         Object parsedResult = CodeParserExecutor.executeParser(completedCode,codeGenType);
                         //使用执行器保存代码
-                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult,codeGenType);
+                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult,codeGenType, appId);
                         log.info("{} mode files saved successfully: {}", codeGenType, savedDir.getAbsolutePath());
                     } catch (Exception e) {
-                        log.error("{} mode file saved failed, error: {}", codeGenType, e.getMessage());
+                        log.error("{} mode file saved failed, error: {}", codeGenType, e.getMessage(),e);
                     }
                 });
     }

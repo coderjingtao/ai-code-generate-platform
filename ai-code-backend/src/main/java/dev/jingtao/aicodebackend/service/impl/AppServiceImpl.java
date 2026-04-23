@@ -1,14 +1,19 @@
 package dev.jingtao.aicodebackend.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import dev.jingtao.aicodebackend.constant.AppConstant;
+import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
 import dev.jingtao.aicodebackend.mapper.AppMapper;
-import dev.jingtao.aicodebackend.model.dto.app.*;
+import dev.jingtao.aicodebackend.model.dto.app.AppAddRequest;
+import dev.jingtao.aicodebackend.model.dto.app.AppAdminUpdateRequest;
+import dev.jingtao.aicodebackend.model.dto.app.AppQueryRequest;
+import dev.jingtao.aicodebackend.model.dto.app.AppUpdateRequest;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
@@ -20,9 +25,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +45,26 @@ import java.util.stream.Collectors;
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     private final UsersService usersService;
+    private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
+
+    @Override
+    public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser) {
+        // 1.参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
+        ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
+        // 2.查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR,"应用不存在");
+        // 3.权限校验
+        ThrowUtils.throwIf(ObjectUtil.notEqual(app.getUserId(),loginUser.getId()),ErrorCode.NO_AUTH_ERROR,"无权限访问应用");
+        // 4.获取代码的生成类型
+        String codeGenType = app.getCodeGenType();
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "代码的生成类型错误");
+        // 5.调用 AI 生成代码（流式）
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId);
+        return codeStream;
+    }
 
     @Override
     public long createApp(AppAddRequest appAddRequest, Users loginUser) {

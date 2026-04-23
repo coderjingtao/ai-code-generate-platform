@@ -1,5 +1,7 @@
 package dev.jingtao.aicodebackend.controller;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import dev.jingtao.aicodebackend.annotation.AuthCheck;
 import dev.jingtao.aicodebackend.common.BaseResponse;
@@ -20,9 +22,14 @@ import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.UsersService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 应用 控制层。
@@ -40,6 +47,34 @@ public class AppController {
 
     @Resource
     private UsersService usersService;
+
+    @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                      @RequestParam String userPrompt,
+                                      HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "Invalid app id");
+        ThrowUtils.throwIf(StrUtil.isBlank(userPrompt), ErrorCode.PARAMS_ERROR, "User prompt must not be empty");
+        Users loginUser = usersService.getLoginUser(request);
+        // 调用AI服务生成流式代码
+        Flux<String> codeStream = appService.chatToGenCode(appId, userPrompt, loginUser);
+        // 把流式代码封装成 ServerSentEvent 格式，解决前端空格丢失的问题
+        return codeStream
+                .map(code -> {
+                    //将内容包装成JSON对象
+                    Map<String, String> wrapper = Map.of("d", code);
+                    String json = JSONUtil.toJsonStr(wrapper);
+                    return ServerSentEvent.<String>builder()
+                            .data(json)
+                            .build();
+                })
+                .concatWith(Mono.just(
+                        // 发送结束事件，明确告诉前端已经正常结束
+                        ServerSentEvent.<String>builder()
+                                .event("done")
+                                .data("")
+                                .build()
+                ));
+    }
 
     /**
      * 普通用户创建应用（initPrompt 必填）

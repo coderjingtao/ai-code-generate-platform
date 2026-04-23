@@ -21,10 +21,10 @@ public class CodeFileSaverExecutor {
      * @param codeGenType 代码生成的类型
      * @return 保存文件的目录
      */
-    public static File executeSaver(Object codeResult, CodeGenTypeEnum codeGenType){
+    public static File executeSaver(Object codeResult, CodeGenTypeEnum codeGenType, Long appId){
         return switch (codeGenType){
-            case HTML -> htmlCodeFileSaver.saveCode((HtmlCodeResult) codeResult);
-            case MULTI_FILE -> multiFileCodeFileSaver.saveCode((MultiFileCodeResult) codeResult);
+            case HTML -> htmlCodeFileSaver.saveCode((HtmlCodeResult) codeResult, appId);
+            case MULTI_FILE -> multiFileCodeFileSaver.saveCode((MultiFileCodeResult) codeResult, appId);
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenType);
         };
     }

@@ -1,7 +1,6 @@
 package dev.jingtao.aicodebackend.core.saver;
 
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.exception.BusinessException;
@@ -25,11 +24,11 @@ public abstract class CodeFileSaverTemplate<T> {
      * @param result 代码结果对象
      * @return 保存的文件目录
      */
-    public final File saveCode(T result){
+    public final File saveCode(T result, Long appId){
         // 1. 验证输入
         validateInput(result);
         // 2. 构建唯一保存目录
-        String baseDirPath = buildUniqueDir();
+        String baseDirPath = buildUniqueDir(appId);
         // 3. 保存代码到文件（具体实现由子类提供）
         saveFiles(result, baseDirPath);
         // 4. 返回目录文件对象
@@ -50,9 +49,9 @@ public abstract class CodeFileSaverTemplate<T> {
      * 构建唯一文件保存目录
      * @return 保存文件的目录路径
      */
-    protected final String buildUniqueDir(){
+    protected final String buildUniqueDir(Long appId){
         String codeType = getCodeType().getValue();
-        String uniqueDir = StrUtil.format("{}_{}", codeType, IdUtil.getSnowflakeNextIdStr());
+        String uniqueDir = StrUtil.format("{}_{}", codeType, appId);
         String dir = FILE_SAVE_ROOT_DIR + File.separator + uniqueDir;
         FileUtil.mkdir(dir);
         return dir;
