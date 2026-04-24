@@ -11,10 +11,7 @@ import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.constant.UserConstant;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
-import dev.jingtao.aicodebackend.model.dto.app.AppAddRequest;
-import dev.jingtao.aicodebackend.model.dto.app.AppAdminUpdateRequest;
-import dev.jingtao.aicodebackend.model.dto.app.AppQueryRequest;
-import dev.jingtao.aicodebackend.model.dto.app.AppUpdateRequest;
+import dev.jingtao.aicodebackend.model.dto.app.*;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.vo.AppVO;
@@ -48,6 +45,13 @@ public class AppController {
     @Resource
     private UsersService usersService;
 
+    /**
+     * 用户提示词生成应用，并流式返回给前端
+     * @param appId 应用ID
+     * @param userPrompt 用户提示词
+     * @param request 请求
+     * @return SSE 流式字符串
+     */
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                       @RequestParam String userPrompt,
@@ -74,6 +78,25 @@ public class AppController {
                                 .data("")
                                 .build()
                 ));
+    }
+
+    /**
+     * 应用部署
+     * @param appDeployRequest 应用部署请求对象
+     * @param request 请求
+     * @return 部署完成后到URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
+        // 获取App ID
+        Long appId = appDeployRequest.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "Invalid app id");
+        // 获取登录用户
+        Users loginUser = usersService.getLoginUser(request);
+        // 部署服务
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
     }
 
     /**

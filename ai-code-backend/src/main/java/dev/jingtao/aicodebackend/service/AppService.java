@@ -40,6 +40,15 @@ public interface AppService extends IService<App> {
     long createApp(AppAddRequest appAddRequest, Users loginUser);
 
     /**
+     * 部署应用
+     *
+     * @param appId 应用ID
+     * @param loginUser     当前登录用户
+     * @return 新应用 id
+     */
+    String deployApp(Long appId, Users loginUser);
+
+    /**
      * 修改自己的应用（仅支持修改名称）
      *
      * @param appUpdateRequest 更新请求
