@@ -1,17 +1,19 @@
 declare namespace API {
+  type IdType = string | number
+
   type AppAddRequest = {
     initPrompt?: string
   }
 
   type AppAdminUpdateRequest = {
-    id?: number
+    id?: IdType
     appName?: string
     cover?: string
     priority?: number
   }
 
   type AppDeployRequest = {
-    appId?: number
+    appId?: IdType
   }
 
   type AppQueryRequest = {
@@ -19,7 +21,7 @@ declare namespace API {
     pageSize?: number
     sortField?: string
     sortOrder?: string
-    id?: number
+    id?: IdType
     appName?: string
     cover?: string
     initPrompt?: string
@@ -30,12 +32,12 @@ declare namespace API {
   }
 
   type AppUpdateRequest = {
-    id?: number
+    id?: IdType
     appName?: string
   }
 
   type AppVO = {
-    id?: number
+    id?: IdType
     appName?: string
     cover?: string
     initPrompt?: string
@@ -69,7 +71,7 @@ declare namespace API {
 
   type BaseResponseLong = {
     code?: number
-    data?: number
+    data?: IdType
     message?: string
   }
 
@@ -104,20 +106,20 @@ declare namespace API {
   }
 
   type chatToGenCodeParams = {
-    appId: number
+    appId: IdType
     userPrompt: string
   }
 
   type DeleteRequest = {
-    id?: number
+    id?: IdType
   }
 
   type getAppByIdForAdminParams = {
-    id: number
+    id: IdType
   }
 
   type getMyAppByIdParams = {
-    id: number
+    id: IdType
   }
 
   type getUserByIdParams = {

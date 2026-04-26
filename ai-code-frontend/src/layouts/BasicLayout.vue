@@ -1,22 +1,35 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 
 import GlobalFooter from '@/components/GlobalFooter.vue'
 import GlobalHeader from '@/components/GlobalHeader.vue'
 import { globalMenuItems } from '@/config/navigation'
+
+const route = useRoute()
+
+const isChatPage = computed(() => route.path.startsWith('/app/chat'))
+const flushLayout = computed(() => route.path === '/' || route.path.startsWith('/app/chat'))
+const showFooter = computed(() => !route.path.startsWith('/app/chat'))
 </script>
 
 <template>
   <a-layout class="basic-layout">
     <GlobalHeader :menu-items="globalMenuItems" />
 
-    <a-layout-content class="basic-layout__content">
-      <main class="basic-layout__content-inner">
+    <a-layout-content :class="['basic-layout__content', { 'basic-layout__content--chat': isChatPage }]">
+      <main
+        :class="[
+          'basic-layout__content-inner',
+          { 'basic-layout__content-inner--flush': flushLayout },
+          { 'basic-layout__content-inner--chat': isChatPage },
+        ]"
+      >
         <RouterView />
       </main>
     </a-layout-content>
 
-    <GlobalFooter />
+    <GlobalFooter v-if="showFooter" />
   </a-layout>
 </template>
 
@@ -36,9 +49,11 @@ import { globalMenuItems } from '@/config/navigation'
 :global(body) {
   overflow: hidden;
   background: #f5f7fb;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
 .basic-layout {
+  --global-header-height: 72px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -49,7 +64,13 @@ import { globalMenuItems } from '@/config/navigation'
   flex: 1;
   display: flex;
   width: 100%;
+  min-height: 0;
   overflow: auto;
+}
+
+.basic-layout__content--chat {
+  height: calc(100vh - var(--global-header-height));
+  overflow: hidden;
 }
 
 .basic-layout__content-inner {
@@ -60,9 +81,28 @@ import { globalMenuItems } from '@/config/navigation'
   padding: 24px;
 }
 
+.basic-layout__content-inner--flush {
+  padding: 0;
+}
+
+.basic-layout__content-inner--chat {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 @media (max-width: 900px) {
+  .basic-layout {
+    --global-header-height: 64px;
+  }
+
   .basic-layout__content-inner {
     padding: 16px;
+  }
+
+  .basic-layout__content-inner--flush {
+    padding: 0;
   }
 }
 </style>

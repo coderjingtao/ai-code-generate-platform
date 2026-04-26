@@ -20,6 +20,7 @@ const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser?.id))
 const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
 const username = computed(() => loginUserStore.loginUser?.userName || 'User')
 const userAvatar = computed(() => loginUserStore.loginUser?.userAvatar || '')
+const isHomePage = computed(() => route.path === '/')
 
 const selectedKeys = computed(() => {
   const activeItem = props.menuItems.find((item) => {
@@ -41,8 +42,18 @@ const handleMenuClick = ({ key }: { key: string }) => {
 }
 
 const handleUserMenuClick = async ({ key }: { key: string }) => {
+  if (key === 'myApps') {
+    await router.push({ path: '/', query: { tab: 'my' } })
+    return
+  }
+
   if (key === 'userManagement') {
     await router.push('/admin/userManagement')
+    return
+  }
+
+  if (key === 'appManagement') {
+    await router.push('/admin/appManagement')
     return
   }
 
@@ -65,6 +76,10 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
   message.info('该功能正在开发中')
 }
 
+const goToHome = () => {
+  void router.push('/')
+}
+
 const goToLoginPage = () => {
   void router.push('/user/login')
 }
@@ -75,17 +90,16 @@ const goToRegisterPage = () => {
 </script>
 
 <template>
-  <a-layout-header class="global-header">
+  <a-layout-header :class="['global-header', { 'global-header--home': isHomePage }]">
     <div class="global-header__inner">
-      <div class="global-header__brand">
-        <img :src="logoUrl" alt="AI Code Generation Platform" class="global-header__logo" />
-        <span class="global-header__title">AI Code Generation Platform</span>
-      </div>
+      <button type="button" class="global-header__brand" @click="goToHome">
+        <img :src="logoUrl" alt="NoCode" class="global-header__logo" />
+        <span class="global-header__title">NoCode</span>
+      </button>
 
       <div class="global-header__menu-wrap">
         <a-menu
           mode="horizontal"
-          theme="dark"
           :selected-keys="selectedKeys"
           :items="menuItems"
           @click="handleMenuClick"
@@ -94,7 +108,7 @@ const goToRegisterPage = () => {
 
       <a-dropdown v-if="isLoggedIn" :trigger="['click']">
         <button type="button" class="global-header__user-trigger">
-          <a-avatar :size="40" :src="userAvatar" class="global-header__avatar">
+          <a-avatar :size="36" :src="userAvatar" class="global-header__avatar">
             {{ username.slice(0, 1).toUpperCase() }}
           </a-avatar>
           <span class="global-header__username">{{ username }}</span>
@@ -102,9 +116,9 @@ const goToRegisterPage = () => {
         </button>
         <template #overlay>
           <a-menu @click="handleUserMenuClick">
+            <a-menu-item key="myApps">我的应用</a-menu-item>
+            <a-menu-item v-if="isAdmin" key="appManagement">应用管理</a-menu-item>
             <a-menu-item v-if="isAdmin" key="userManagement">用户管理</a-menu-item>
-            <a-menu-item key="profile">个人中心</a-menu-item>
-            <a-menu-item key="settings">账号设置</a-menu-item>
             <a-menu-divider />
             <a-menu-item key="logout">退出登录</a-menu-item>
           </a-menu>
@@ -112,8 +126,8 @@ const goToRegisterPage = () => {
       </a-dropdown>
 
       <div v-else class="global-header__auth-actions">
-        <a-button @click="goToRegisterPage">注册</a-button>
-        <a-button type="primary" @click="goToLoginPage">登录</a-button>
+        <a-button type="text" @click="goToRegisterPage">注册</a-button>
+        <a-button type="primary" shape="round" @click="goToLoginPage">登录</a-button>
       </div>
     </div>
   </a-layout-header>
@@ -122,82 +136,102 @@ const goToRegisterPage = () => {
 <style scoped>
 .global-header {
   height: auto;
+  min-height: 72px;
   line-height: normal;
   padding: 0 28px;
   position: sticky;
   top: 0;
   z-index: 10;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.global-header--home {
+  background: #f7fbff;
+  border-bottom: none;
+  backdrop-filter: none;
 }
 
 .global-header__inner {
   display: flex;
   align-items: center;
-  gap: 26px;
-  min-height: 78px;
+  gap: 22px;
+  min-height: 72px;
   width: 100%;
 }
 
 .global-header__brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: max-content;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 
 .global-header__logo {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
 }
 
 .global-header__title {
-  color: #fff;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
+  color: #0f172a;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
 }
 
 .global-header__menu-wrap {
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 .global-header__menu-wrap :deep(.ant-menu) {
-  min-width: max-content;
+  min-width: 0;
   border-bottom: none;
   background: transparent;
+  color: rgba(15, 23, 42, 0.68);
+  font-weight: 500;
+}
+
+.global-header__menu-wrap :deep(.ant-menu-item-selected) {
+  color: #0f172a;
 }
 
 .global-header__user-trigger {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 0;
+  border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 999px;
-  padding: 6px 12px 6px 6px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
+  padding: 4px 12px 4px 4px;
+  background: #fff;
+  color: #0f172a;
   cursor: pointer;
   min-width: max-content;
 }
 
 .global-header__user-trigger:hover {
-  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(34, 197, 94, 0.55);
 }
 
 .global-header__avatar {
-  background: linear-gradient(135deg, #4096ff, #73d13d);
+  background: linear-gradient(135deg, #22d3ee, #2563eb);
   font-weight: 600;
 }
 
 .global-header__username {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .global-header__caret {
   font-size: 13px;
-  opacity: 0.9;
+  opacity: 0.75;
 }
 
 .global-header__auth-actions {
@@ -208,13 +242,14 @@ const goToRegisterPage = () => {
 
 @media (max-width: 900px) {
   .global-header {
+    min-height: 64px;
     padding: 0 16px;
   }
 
   .global-header__inner {
     flex-wrap: wrap;
-    gap: 12px;
-    min-height: 72px;
+    gap: 10px;
+    min-height: 64px;
     padding: 8px 0;
   }
 
@@ -224,12 +259,12 @@ const goToRegisterPage = () => {
   }
 
   .global-header__title {
-    font-size: 16px;
+    font-size: 26px;
   }
 
   .global-header__logo {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
   }
 
   .global-header__user-trigger {
@@ -241,7 +276,7 @@ const goToRegisterPage = () => {
   }
 
   .global-header__username {
-    max-width: 120px;
+    max-width: 110px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

@@ -24,6 +24,21 @@ const router = createRouter({
       component: () => import('@/views/admin/UserManagementView.vue'),
     },
     {
+      path: '/admin/appManagement',
+      name: 'app management',
+      component: () => import('@/views/admin/AppManagementView.vue'),
+    },
+    {
+      path: '/app/chat/:id',
+      name: 'app chat',
+      component: () => import('@/views/app/AppChatView.vue'),
+    },
+    {
+      path: '/app/edit/:id',
+      name: 'app edit',
+      component: () => import('@/views/app/AppEditView.vue'),
+    },
+    {
       path: '/workspace',
       name: 'workspace',
       component: () => import('@/views/WorkspaceView.vue'),

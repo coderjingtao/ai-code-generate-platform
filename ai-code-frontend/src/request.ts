@@ -1,9 +1,16 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
+import { API_BASE_URL } from '@/config/env'
+
+const loginRequiredPathPrefixes = ['/app/chat', '/app/edit', '/admin', '/workspace', '/history']
+
+const shouldRedirectToLogin = (pathname: string) => {
+  return loginRequiredPathPrefixes.some((prefix) => pathname.startsWith(prefix))
+}
 
 // 创建 Axios 实例
 const myAxios = axios.create({
-  baseURL: 'http://localhost:8123/api',
+  baseURL: API_BASE_URL,
   timeout: 60000,
   withCredentials: true, //false: 不携带cookie，true: 携带cookie
 })
@@ -26,11 +33,12 @@ myAxios.interceptors.response.use(
     const { data } = response
     // 未登录
     if (data.code === 40100) {
-      // 不是获取用户信息的请求，并且用户目前不是已经在用户登录页面，则跳转到登录页面
-      if (
-        !response.request.responseURL.includes('user/get/login') &&
-        !window.location.pathname.includes('/user/login')
-      ) {
+      const currentPath = window.location.pathname
+      const isLoginUserApi = response.request.responseURL.includes('user/get/login')
+      const isAuthPage =
+        currentPath.startsWith('/user/login') || currentPath.startsWith('/user/register')
+
+      if (!isLoginUserApi && !isAuthPage && shouldRedirectToLogin(currentPath)) {
         message.warning('Please log in first')
         window.location.href = `/user/login?redirect=${window.location.href}`
       }

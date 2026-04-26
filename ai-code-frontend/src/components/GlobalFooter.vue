@@ -15,17 +15,18 @@
 .global-footer {
   width: 100%;
   text-align: center;
-  background: #001529;
-  color: rgba(255, 255, 255, 0.85);
+  background: #fff;
+  color: rgba(15, 23, 42, 0.75);
   padding: 18px 24px;
   margin-top: auto;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .global-footer a {
-  color: #91caff;
+  color: #2563eb;
 }
 
 .global-footer a:hover {
-  color: #bae0ff;
+  color: #1d4ed8;
 }
 </style>
