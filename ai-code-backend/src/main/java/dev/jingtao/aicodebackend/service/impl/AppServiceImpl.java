@@ -19,10 +19,12 @@ import dev.jingtao.aicodebackend.model.dto.app.AppQueryRequest;
 import dev.jingtao.aicodebackend.model.dto.app.AppUpdateRequest;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
+import dev.jingtao.aicodebackend.model.enums.ChatHistoryMessageTypeEnum;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
 import dev.jingtao.aicodebackend.model.vo.AppVO;
 import dev.jingtao.aicodebackend.model.vo.UserVO;
 import dev.jingtao.aicodebackend.service.AppService;
+import dev.jingtao.aicodebackend.service.ChatHistoryService;
 import dev.jingtao.aicodebackend.service.UsersService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     private final UsersService usersService;
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    private final ChatHistoryService chatHistoryService;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser) {
@@ -65,9 +69,31 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String codeGenType = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "代码的生成类型错误");
-        // 5.调用 AI 生成代码（流式）
+        // 5.添加[用户消息]到对话历史
+        chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
+        // 6.调用 AI 生成代码（流式）
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId);
-        return codeStream;
+        // 7.收集AI响应内容并在完成后添加到对话历史中
+        StringBuilder aiMessageBuilder = new StringBuilder();
+        return codeStream
+                .map(chunk -> {
+                    // 收集 AI 响应内容
+                    aiMessageBuilder.append(chunk);
+                    return chunk;
+                })
+                .doOnComplete(() -> {
+                   // AI 流式响应完成后，添加AI消息到对话历史
+                   String aiMessage = aiMessageBuilder.toString();
+                   if(StrUtil.isNotBlank(aiMessage)) {
+                       chatHistoryService.addChatHistory(appId, aiMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                   }
+                })
+                .doOnError(error -> {
+                    // 如果 AI 回复失败，也要记录错误信息
+                    String aiErrorMessage = "AI response failed: " + error.getMessage();
+                    chatHistoryService.addChatHistory(appId, aiErrorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    log.error("AI response failed: {}", error.getMessage());
+                });
     }
 
     @Override
@@ -272,4 +298,28 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .orderBy(sortField, "ascend".equals(sortOrder));
     }
 
+    /**
+     * 重写MyBatis Flex中IService的删除应用的方法，需要删除关联对话历史记录
+     * @param id 应用id
+     * @return 是否删除成功
+     */
+    @Override
+    public boolean removeById(Serializable id) {
+        if(id == null) {
+            return false;
+        }
+        Long appId = Long.parseLong(id.toString());
+        if(appId <= 0) {
+            return false;
+        }
+        //先删除关联的对话历史
+        try{
+            chatHistoryService.deleteByAppId(appId);
+        }catch (Exception e) {
+            //记录日志但不阻止应用的删除
+            log.error("删除应用: {} 的对话历史失败, 错误信息是: {}", appId, e.getMessage(), e);
+        }
+        //再删除应用
+        return super.removeById(id);
+    }
 }
