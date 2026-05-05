@@ -3,7 +3,8 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
-import { addApp, deleteMyApp, listGoodAppByPage, listMyAppByPage } from '@/api/appController'
+import AppCard from '@/components/AppCard.vue'
+import { addApp, listGoodAppByPage, listMyAppByPage } from '@/api/appController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 
 interface AppListState {
@@ -21,7 +22,6 @@ const loginUserStore = useLoginUserStore()
 
 const createPrompt = ref('')
 const creating = ref(false)
-const deletingId = ref<API.IdType>()
 const mySectionRef = ref<HTMLElement>()
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser?.id))
@@ -63,16 +63,13 @@ const goToChat = (record: API.AppVO, admin = false) => {
   })
 }
 
-const goToEdit = (record: API.AppVO, admin = false) => {
-  if (!record.id) {
-    message.warning('应用 ID 不存在')
+const goToWork = (record: API.AppVO) => {
+  const deployKey = record.deployKey?.trim()
+  if (!deployKey) {
+    message.info('该应用暂未部署作品')
     return
   }
-
-  void router.push({
-    path: `/app/edit/${record.id}`,
-    query: admin ? { admin: '1' } : undefined,
-  })
+  window.open(`http://localhost:8080/${encodeURIComponent(deployKey)}`, '_blank')
 }
 
 const goToLogin = () => {
@@ -100,9 +97,9 @@ const loadMyApps = async () => {
       return
     }
 
-    message.error(res.data.message || '获取我的应用失败')
+    message.error(res.data.message || '获取我的作品失败')
   } catch {
-    message.error('获取我的应用失败，请稍后重试')
+    message.error('获取我的作品失败，请稍后重试')
   } finally {
     myState.loading = false
   }
@@ -125,9 +122,9 @@ const loadGoodApps = async () => {
       return
     }
 
-    message.error(res.data.message || '获取精选应用失败')
+    message.error(res.data.message || '获取精选案例失败')
   } catch {
-    message.error('获取精选应用失败，请稍后重试')
+    message.error('获取精选案例失败，请稍后重试')
   } finally {
     goodState.loading = false
   }
@@ -161,31 +158,6 @@ const handleCreateApp = async () => {
     message.error('创建应用失败，请稍后重试')
   } finally {
     creating.value = false
-  }
-}
-
-const handleDeleteMyApp = async (record: API.AppVO) => {
-  if (!record.id) {
-    message.warning('应用 ID 不存在')
-    return
-  }
-
-  deletingId.value = record.id
-  try {
-    const res = await deleteMyApp({ id: record.id })
-    if (res.data.code === 0) {
-      message.success('删除应用成功')
-      if (myState.pageNum > 1 && myState.list.length === 1) {
-        myState.pageNum -= 1
-      }
-      await loadMyApps()
-      return
-    }
-    message.error(res.data.message || '删除应用失败')
-  } catch {
-    message.error('删除应用失败，请稍后重试')
-  } finally {
-    deletingId.value = undefined
   }
 }
 
@@ -228,6 +200,29 @@ const onGoodPageChange = (page: number, pageSize: number) => {
 const usePromptTemplate = (prompt: string) => {
   createPrompt.value = prompt
 }
+
+const patchCreatorInfo = (app: API.AppVO): API.AppVO => {
+  if (app.user?.userName || app.user?.userAvatar) {
+    return app
+  }
+
+  const loginUser = loginUserStore.loginUser
+  if (loginUser?.id && app.userId === loginUser.id) {
+    return {
+      ...app,
+      user: {
+        id: loginUser.id,
+        userName: loginUser.userName,
+        userAvatar: loginUser.userAvatar,
+      },
+    }
+  }
+
+  return app
+}
+
+const myDisplayApps = computed(() => myState.list.map(patchCreatorInfo))
+const goodDisplayApps = computed(() => goodState.list.map(patchCreatorInfo))
 
 const scrollToMySection = async () => {
   await nextTick()
@@ -312,7 +307,7 @@ onMounted(() => {
     <section class="home-page__content">
       <section v-if="isLoggedIn" ref="mySectionRef" class="app-section">
         <div class="app-section__header">
-          <h2>我的应用</h2>
+          <h2>我的作品</h2>
           <div class="app-section__query">
             <a-input
               v-model:value="myState.keyword"
@@ -327,32 +322,16 @@ onMounted(() => {
         </div>
 
         <a-spin :spinning="myState.loading">
-          <div v-if="myState.list.length" class="app-grid">
-            <article v-for="item in myState.list" :key="item.id" class="app-tile">
-              <div class="app-tile__cover">
-                <img v-if="item.cover" :src="item.cover" :alt="item.appName || 'cover'" />
-                <span v-else>{{ item.appName?.slice(0, 1) || 'A' }}</span>
-              </div>
-              <div class="app-tile__body">
-                <h3 class="app-tile__title">{{ item.appName || '未命名应用' }}</h3>
-                <p class="app-tile__meta">创建时间：{{ item.createTime || '-' }}</p>
-                <p class="app-tile__prompt">{{ item.initPrompt || '暂无初始提示词' }}</p>
-                <div class="app-tile__actions">
-                  <a-button type="link" @click="goToChat(item)">详情</a-button>
-                  <a-button type="link" @click="goToEdit(item)">编辑</a-button>
-                  <a-popconfirm
-                    title="确认删除该应用吗？"
-                    ok-text="确认"
-                    cancel-text="取消"
-                    @confirm="handleDeleteMyApp(item)"
-                  >
-                    <a-button type="link" danger :loading="deletingId === item.id">删除</a-button>
-                  </a-popconfirm>
-                </div>
-              </div>
-            </article>
+          <div v-if="myDisplayApps.length" class="app-grid">
+            <AppCard
+              v-for="item in myDisplayApps"
+              :key="item.id"
+              :app="item"
+              @view-chat="goToChat"
+              @view-work="goToWork"
+            />
           </div>
-          <a-empty v-else description="暂无应用，先从上方输入提示词创建一个吧" />
+          <a-empty v-else description="暂无作品，先从上方输入提示词创建一个吧" />
         </a-spin>
 
         <div class="app-section__pagination">
@@ -370,7 +349,7 @@ onMounted(() => {
 
       <section class="app-section">
         <div class="app-section__header">
-          <h2>精选应用</h2>
+          <h2>精选案例</h2>
           <div class="app-section__query">
             <a-input
               v-model:value="goodState.keyword"
@@ -385,25 +364,16 @@ onMounted(() => {
         </div>
 
         <a-spin :spinning="goodState.loading">
-          <div v-if="goodState.list.length" class="app-grid">
-            <article v-for="item in goodState.list" :key="item.id" class="app-tile">
-              <div class="app-tile__cover">
-                <img v-if="item.cover" :src="item.cover" :alt="item.appName || 'cover'" />
-                <span v-else>{{ item.appName?.slice(0, 1) || 'G' }}</span>
-              </div>
-              <div class="app-tile__body">
-                <h3 class="app-tile__title">{{ item.appName || '未命名应用' }}</h3>
-                <p class="app-tile__meta">
-                  作者：{{ item.user?.userName || '匿名用户' }} · 优先级：{{ item.priority ?? '-' }}
-                </p>
-                <p class="app-tile__prompt">{{ item.initPrompt || '暂无初始提示词' }}</p>
-                <div class="app-tile__actions">
-                  <a-button type="link" @click="goToChat(item)">查看详情</a-button>
-                </div>
-              </div>
-            </article>
+          <div v-if="goodDisplayApps.length" class="app-grid">
+            <AppCard
+              v-for="item in goodDisplayApps"
+              :key="item.id"
+              :app="item"
+              @view-chat="goToChat"
+              @view-work="goToWork"
+            />
           </div>
-          <a-empty v-else description="暂无精选应用" />
+          <a-empty v-else description="暂无精选案例" />
         </a-spin>
 
         <div class="app-section__pagination">
@@ -601,76 +571,6 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-}
-
-.app-tile {
-  background: #fcfdff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  overflow: hidden;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.app-tile:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.1);
-}
-
-.app-tile__cover {
-  height: 140px;
-  background: linear-gradient(138deg, #dff6ff 0%, #b9ddff 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.app-tile__cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.app-tile__cover span {
-  font-size: 44px;
-  font-weight: 600;
-  color: rgba(15, 23, 42, 0.55);
-}
-
-.app-tile__body {
-  padding: 14px 14px 12px;
-}
-
-.app-tile__title {
-  margin: 0;
-  font-size: 17px;
-  color: #0f172a;
-  line-height: 1.35;
-}
-
-.app-tile__meta {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: rgba(15, 23, 42, 0.56);
-}
-
-.app-tile__prompt {
-  margin: 8px 0 10px;
-  min-height: 38px;
-  font-size: 13px;
-  color: rgba(15, 23, 42, 0.74);
-  line-height: 1.46;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.app-tile__actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 
 .app-section__pagination {

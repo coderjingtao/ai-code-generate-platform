@@ -43,7 +43,7 @@ const adminQueryEnabled = computed(() => {
 })
 const isAdminEdit = computed(() => adminEditMode.value)
 
-const pageTitle = computed(() => (isAdminEdit.value ? '编辑应用（管理员）' : '编辑我的应用'))
+const pageTitle = computed(() => (isAdminEdit.value ? '编辑应用（管理员）' : '编辑我的作品'))
 
 const ensureAdminEditMode = async () => {
   if (!adminQueryEnabled.value) {

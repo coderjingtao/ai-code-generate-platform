@@ -4,7 +4,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
 import request from '@/request'
-import { deployApp, getAppByIdForAdmin, getMyAppById } from '@/api/appController'
+import aiAvatarUrl from '@/assets/aiAvatar.png'
+import {
+  deleteAppByAdmin,
+  deleteMyApp,
+  deployApp,
+  getAppByIdForAdmin,
+  getMyAppById,
+} from '@/api/appController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 import { getStaticPreviewUrl } from '@/config/env'
 
@@ -38,6 +45,8 @@ const eventSourceRef = ref<EventSource | null>(null)
 
 const deployModalOpen = ref(false)
 const deployedUrl = ref('')
+const appDetailOpen = ref(false)
+const deletingApp = ref(false)
 const CHAT_STREAM_PATH = '/app/chat/gen/code'
 
 const appId = computed(() => {
@@ -53,6 +62,40 @@ const adminModeEnabled = ref(false)
 
 const appName = computed(() => appInfo.value?.appName || `应用 #${appId.value}`)
 const baseApiUrl = computed(() => String(request.defaults.baseURL || '/api').replace(/\/$/, ''))
+const loginUserName = computed(() => loginUserStore.loginUser?.userName || '我')
+const loginUserAvatar = computed(() => loginUserStore.loginUser?.userAvatar || '')
+const isOwner = computed(() => {
+  const loginUserId = loginUserStore.loginUser?.id
+  return Boolean(loginUserId && appInfo.value?.userId && loginUserId === appInfo.value.userId)
+})
+const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
+const canManageApp = computed(() => isOwner.value || isAdmin.value)
+const appCreatorName = computed(() => {
+  if (appInfo.value?.user?.userName) {
+    return appInfo.value.user.userName
+  }
+  if (isOwner.value && loginUserStore.loginUser?.userName) {
+    return loginUserStore.loginUser.userName
+  }
+  return '匿名用户'
+})
+const appCreatorAvatar = computed(() => {
+  if (appInfo.value?.user?.userAvatar) {
+    return appInfo.value.user.userAvatar
+  }
+  if (isOwner.value && loginUserStore.loginUser?.userAvatar) {
+    return loginUserStore.loginUser.userAvatar
+  }
+  return ''
+})
+
+const getMessageAvatar = (role: ChatMessage['role']) => {
+  return role === 'assistant' ? aiAvatarUrl : loginUserAvatar.value
+}
+
+const getMessageAvatarFallback = (role: ChatMessage['role']) => {
+  return role === 'assistant' ? 'AI' : loginUserName.value.slice(0, 1).toUpperCase()
+}
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -479,6 +522,47 @@ const openDeployUrl = () => {
   window.open(deployedUrl.value, '_blank')
 }
 
+const openAppDetail = () => {
+  appDetailOpen.value = true
+}
+
+const goToAppEdit = () => {
+  if (!appId.value) {
+    message.error('应用 ID 不合法')
+    return
+  }
+
+  void router.push({
+    path: `/app/edit/${appId.value}`,
+    query: adminModeEnabled.value ? { admin: '1' } : undefined,
+  })
+}
+
+const handleDeleteApp = async () => {
+  const currentId = appInfo.value?.id
+  if (!currentId) {
+    message.error('应用 ID 不合法')
+    return
+  }
+
+  deletingApp.value = true
+  try {
+    const useAdminDelete = adminModeEnabled.value || (isAdmin.value && !isOwner.value)
+    const res = useAdminDelete ? await deleteAppByAdmin({ id: currentId }) : await deleteMyApp({ id: currentId })
+    if (res.data.code === 0) {
+      message.success('删除应用成功')
+      appDetailOpen.value = false
+      await router.replace('/')
+      return
+    }
+    message.error(res.data.message || '删除应用失败')
+  } catch {
+    message.error('删除应用失败，请稍后重试')
+  } finally {
+    deletingApp.value = false
+  }
+}
+
 const sendCurrentPrompt = () => {
   void sendPrompt()
 }
@@ -493,6 +577,9 @@ const removeInitPromptFromUrl = async () => {
 }
 
 onMounted(async () => {
+  if (!loginUserStore.loginUser?.id) {
+    await loginUserStore.fetchLoginUser()
+  }
   await loadAppInfo()
   const initPromptQuery = Array.isArray(route.query.initPrompt)
     ? route.query.initPrompt[0]
@@ -520,6 +607,7 @@ onBeforeUnmount(() => {
       </div>
       <a-space>
         <a-button @click="router.push('/')">返回首页</a-button>
+        <a-button @click="openAppDetail">应用详情</a-button>
         <a-button type="primary" :loading="deploying" @click="handleDeploy">部署应用</a-button>
       </a-space>
     </header>
@@ -532,6 +620,9 @@ onBeforeUnmount(() => {
             :key="item.id"
             :class="['chat-message', `chat-message--${item.role}`]"
           >
+            <a-avatar :src="getMessageAvatar(item.role)" class="chat-message__avatar">
+              {{ getMessageAvatarFallback(item.role) }}
+            </a-avatar>
             <div class="chat-message__bubble">
               <template
                 v-for="(segment, index) in getMessageSegments(item)"
@@ -615,6 +706,43 @@ onBeforeUnmount(() => {
         </a-space>
       </div>
     </a-modal>
+
+    <a-modal
+      v-model:open="appDetailOpen"
+      title="应用详情"
+      :footer="null"
+      :mask-closable="true"
+      width="560px"
+    >
+      <section class="app-detail">
+        <div class="app-detail__block">
+          <h3>应用基础信息</h3>
+          <div class="app-detail__creator">
+            <a-avatar :size="44" :src="appCreatorAvatar">{{ appCreatorName.slice(0, 1).toUpperCase() }}</a-avatar>
+            <div>
+              <p class="app-detail__label">创建者</p>
+              <p class="app-detail__value">{{ appCreatorName }}</p>
+            </div>
+          </div>
+          <p class="app-detail__time">创建时间：{{ appInfo?.createTime || '-' }}</p>
+        </div>
+
+        <div v-if="canManageApp" class="app-detail__block">
+          <h3>操作栏</h3>
+          <a-space>
+            <a-button @click="goToAppEdit">修改</a-button>
+            <a-popconfirm
+              title="确认删除该应用吗？"
+              ok-text="确认"
+              cancel-text="取消"
+              @confirm="handleDeleteApp"
+            >
+              <a-button danger :loading="deletingApp">删除</a-button>
+            </a-popconfirm>
+          </a-space>
+        </div>
+      </section>
+    </a-modal>
   </section>
 </template>
 
@@ -691,6 +819,8 @@ onBeforeUnmount(() => {
 
 .chat-message {
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .chat-message--assistant {
@@ -699,6 +829,22 @@ onBeforeUnmount(() => {
 
 .chat-message--user {
   justify-content: flex-end;
+}
+
+.chat-message__avatar {
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  font-weight: 600;
+}
+
+.chat-message--assistant .chat-message__avatar {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+}
+
+.chat-message--user .chat-message__avatar {
+  order: 2;
 }
 
 .chat-message__bubble {
@@ -850,6 +996,47 @@ onBeforeUnmount(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.app-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-detail__block {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.app-detail__block h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.app-detail__creator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-detail__label {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.56);
+}
+
+.app-detail__value {
+  margin: 2px 0 0;
+  color: #0f172a;
+}
+
+.app-detail__time {
+  margin: 12px 0 0;
+  color: rgba(15, 23, 42, 0.66);
+  font-size: 13px;
 }
 
 .app-chat-view__loading-mask {

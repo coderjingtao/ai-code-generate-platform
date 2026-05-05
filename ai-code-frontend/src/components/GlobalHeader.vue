@@ -116,7 +116,7 @@ const goToRegisterPage = () => {
         </button>
         <template #overlay>
           <a-menu @click="handleUserMenuClick">
-            <a-menu-item key="myApps">我的应用</a-menu-item>
+            <a-menu-item key="myApps">我的作品</a-menu-item>
             <a-menu-item v-if="isAdmin" key="appManagement">应用管理</a-menu-item>
             <a-menu-item v-if="isAdmin" key="userManagement">用户管理</a-menu-item>
             <a-menu-divider />
@@ -201,6 +201,11 @@ const goToRegisterPage = () => {
 
 .global-header__menu-wrap :deep(.ant-menu-item-selected) {
   color: #0f172a;
+}
+
+.global-header__menu-wrap :deep(.ant-menu-horizontal > .ant-menu-item::after),
+.global-header__menu-wrap :deep(.ant-menu-horizontal > .ant-menu-submenu::after) {
+  border-bottom: none !important;
 }
 
 .global-header__user-trigger {
