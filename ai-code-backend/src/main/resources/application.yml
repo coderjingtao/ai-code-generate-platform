@@ -3,9 +3,18 @@ spring:
     name: ai-code-backend
   profiles:
     active: local
+  session:
+    store-type: redis
+    # session ttl 30 days
+    timeout: 2592000
 server:
   port: 8123
-  servlet.context-path: /api
+  servlet:
+    context-path: /api
+    # frontend cookie ttl 30 days
+    session:
+      cookie:
+        max-age: 2592000
 
 # springdoc-openapi
 springdoc:
