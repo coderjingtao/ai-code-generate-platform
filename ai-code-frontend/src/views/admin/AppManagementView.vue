@@ -11,8 +11,8 @@ const router = useRouter()
 const loading = ref(false)
 const total = ref(0)
 const appList = ref<API.AppVO[]>([])
-const deletingId = ref<API.IdType>()
-const featuringId = ref<API.IdType>()
+const deletingId = ref<API.AppVO['id']>()
+const featuringId = ref<API.AppVO['id']>()
 
 const searchParams = reactive<API.AppQueryRequest>({
   pageNum: 1,
@@ -93,7 +93,7 @@ const loadData = async () => {
   try {
     const res = await listAppByPageForAdmin({
       ...searchParams,
-      id: String(searchParams.id ?? '').trim() || undefined,
+      id: searchParams.id ?? undefined,
       appName: searchParams.appName?.trim() || undefined,
       cover: searchParams.cover?.trim() || undefined,
       initPrompt: searchParams.initPrompt?.trim() || undefined,
@@ -223,7 +223,12 @@ onMounted(() => {
       <h2 class="section-title">查询区</h2>
       <a-form layout="inline" class="query-form" :model="searchParams" @finish="doSearch">
         <a-form-item label="ID">
-          <a-input v-model:value="searchParams.id" allow-clear placeholder="应用 ID" style="width: 140px" />
+          <a-input
+            v-model:value="searchParams.id"
+            allow-clear
+            placeholder="应用 ID"
+            style="width: 140px"
+          />
         </a-form-item>
 
         <a-form-item label="名称">
@@ -236,7 +241,12 @@ onMounted(() => {
         </a-form-item>
 
         <a-form-item label="封面">
-          <a-input v-model:value="searchParams.cover" allow-clear placeholder="封面 URL" style="width: 180px" />
+          <a-input
+            v-model:value="searchParams.cover"
+            allow-clear
+            placeholder="封面 URL"
+            style="width: 180px"
+          />
         </a-form-item>
 
         <a-form-item label="初始提示词">
@@ -275,7 +285,12 @@ onMounted(() => {
         </a-form-item>
 
         <a-form-item label="用户 ID">
-          <a-input-number v-model:value="searchParams.userId" :min="1" placeholder="userId" style="width: 120px" />
+          <a-input-number
+            v-model:value="searchParams.userId"
+            :min="1"
+            placeholder="userId"
+            style="width: 120px"
+          />
         </a-form-item>
 
         <a-form-item label="排序字段">
@@ -349,7 +364,11 @@ onMounted(() => {
             <a-space>
               <a-button type="link" @click="openDetailPage(record)">详情</a-button>
               <a-button type="link" @click="openEditPage(record)">编辑</a-button>
-              <a-button type="link" :loading="featuringId === record.id" @click="setFeatured(record)">
+              <a-button
+                type="link"
+                :loading="featuringId === record.id"
+                @click="setFeatured(record)"
+              >
                 精选
               </a-button>
               <a-popconfirm

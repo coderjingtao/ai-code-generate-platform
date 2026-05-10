@@ -12,6 +12,7 @@ import {
   getAppByIdForAdmin,
   getMyAppById,
 } from '@/api/appController'
+import { listAppChatHistory } from '@/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 import { getStaticPreviewUrl } from '@/config/env'
 
@@ -20,6 +21,7 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
+  createTime?: string
 }
 
 interface RenderSegment {
@@ -31,6 +33,7 @@ interface RenderSegment {
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
+const HISTORY_PAGE_SIZE = 10
 
 const appInfo = ref<API.AppVO>()
 const loadingApp = ref(false)
@@ -42,6 +45,12 @@ const inputPrompt = ref('')
 const messages = ref<ChatMessage[]>([])
 const messageContainerRef = ref<HTMLElement>()
 const eventSourceRef = ref<EventSource | null>(null)
+const loadingHistory = ref(false)
+const loadingMoreHistory = ref(false)
+const hasMoreHistory = ref(false)
+const historyCursor = ref<string>()
+const totalHistory = ref(0)
+const historyLoadedCount = ref(0)
 
 const deployModalOpen = ref(false)
 const deployedUrl = ref('')
@@ -97,6 +106,77 @@ const getMessageAvatarFallback = (role: ChatMessage['role']) => {
   return role === 'assistant' ? 'AI' : loginUserName.value.slice(0, 1).toUpperCase()
 }
 
+const isHistoryMessage = (messageItem: ChatMessage) => {
+  return messageItem.id.startsWith('history-')
+}
+
+const compareCreateTime = (left?: string, right?: string) => {
+  const leftTime = left ? new Date(left).getTime() : 0
+  const rightTime = right ? new Date(right).getTime() : 0
+  return leftTime - rightTime
+}
+
+const buildHistoryMessageId = (record: API.ChatHistory, index: number) => {
+  if (record.id !== undefined && record.id !== null) {
+    return `history-${record.id}`
+  }
+  return `history-${record.createTime || 'unknown'}-${record.messageType || 'unknown'}-${index}`
+}
+
+const normalizeHistoryMessageRole = (messageType?: string): ChatMessage['role'] => {
+  const normalized = (messageType || '').trim().toLowerCase()
+  if (['user', 'users', 'human', 'question', 'prompt'].includes(normalized)) {
+    return 'user'
+  }
+  return 'assistant'
+}
+
+const mapHistoryMessages = (records: API.ChatHistory[] = []) => {
+  return records
+    .map((record, index) => ({
+      id: buildHistoryMessageId(record, index),
+      role: normalizeHistoryMessageRole(record.messageType),
+      content: record.message || '',
+      createTime: record.createTime,
+    }))
+    .sort((left, right) => compareCreateTime(left.createTime, right.createTime))
+}
+
+const updateHistoryLoadedCount = () => {
+  historyLoadedCount.value = messages.value.filter((item) => isHistoryMessage(item)).length
+}
+
+const updateHasMoreHistory = (fetchedCount: number, totalRow?: number) => {
+  if (typeof totalRow === 'number' && totalRow >= 0) {
+    totalHistory.value = totalRow
+    hasMoreHistory.value = historyLoadedCount.value < totalRow
+    return
+  }
+  hasMoreHistory.value = fetchedCount >= HISTORY_PAGE_SIZE
+}
+
+const mergeChatMessages = (incomingMessages: ChatMessage[], currentMessages: ChatMessage[]) => {
+  const nextMessages: ChatMessage[] = []
+  const seenIds = new Set<string>()
+
+  for (const item of [...incomingMessages, ...currentMessages]) {
+    if (seenIds.has(item.id)) {
+      continue
+    }
+    seenIds.add(item.id)
+    nextMessages.push(item)
+  }
+
+  return nextMessages
+}
+
+const getOldestCreateTime = (records: API.ChatHistory[] = []) => {
+  return records
+    .map((record) => record.createTime?.trim())
+    .filter((value): value is string => Boolean(value))
+    .sort(compareCreateTime)[0]
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   const box = messageContainerRef.value
@@ -110,6 +190,70 @@ const closeStream = () => {
     eventSourceRef.value.close()
     eventSourceRef.value = null
   }
+}
+
+const loadChatHistory = async (loadMore = false) => {
+  const currentAppId = appId.value
+  if (!currentAppId) {
+    return
+  }
+
+  if (loadMore) {
+    if (!hasMoreHistory.value || !historyCursor.value) {
+      return
+    }
+    loadingMoreHistory.value = true
+  } else {
+    loadingHistory.value = true
+  }
+
+  const box = messageContainerRef.value
+  const previousScrollHeight = box?.scrollHeight ?? 0
+  const previousScrollTop = box?.scrollTop ?? 0
+
+  try {
+    const res = await listAppChatHistory({
+      appId: currentAppId,
+      pageSize: HISTORY_PAGE_SIZE,
+      lastCreateTime: loadMore ? historyCursor.value : undefined,
+    })
+
+    if (res.data.code === 0 && res.data.data) {
+      const records = res.data.data.records ?? []
+      const incomingMessages = mapHistoryMessages(records)
+      const nonHistoryMessages = messages.value.filter((item) => !isHistoryMessage(item))
+
+      if (loadMore) {
+        messages.value = mergeChatMessages(incomingMessages, messages.value)
+        await nextTick()
+        if (box) {
+          const nextScrollHeight = box.scrollHeight
+          box.scrollTop = previousScrollTop + (nextScrollHeight - previousScrollHeight)
+        }
+      } else {
+        messages.value = mergeChatMessages(incomingMessages, nonHistoryMessages)
+      }
+
+      updateHistoryLoadedCount()
+      historyCursor.value = getOldestCreateTime(records)
+      updateHasMoreHistory(records.length, res.data.data.totalRow)
+      return
+    }
+
+    message.error(res.data.message || '加载历史消息失败')
+  } catch {
+    message.error(loadMore ? '加载更多历史消息失败，请稍后重试' : '加载历史消息失败，请稍后重试')
+  } finally {
+    if (loadMore) {
+      loadingMoreHistory.value = false
+    } else {
+      loadingHistory.value = false
+    }
+  }
+}
+
+const loadMoreHistoryMessages = () => {
+  void loadChatHistory(true)
 }
 
 const buildPreviewUrl = (codeGenType?: string) => {
@@ -548,7 +692,9 @@ const handleDeleteApp = async () => {
   deletingApp.value = true
   try {
     const useAdminDelete = adminModeEnabled.value || (isAdmin.value && !isOwner.value)
-    const res = useAdminDelete ? await deleteAppByAdmin({ id: currentId }) : await deleteMyApp({ id: currentId })
+    const res = useAdminDelete
+      ? await deleteAppByAdmin({ id: currentId })
+      : await deleteMyApp({ id: currentId })
     if (res.data.code === 0) {
       message.success('删除应用成功')
       appDetailOpen.value = false
@@ -581,6 +727,7 @@ onMounted(async () => {
     await loginUserStore.fetchLoginUser()
   }
   await loadAppInfo()
+  await loadChatHistory()
   const initPromptQuery = Array.isArray(route.query.initPrompt)
     ? route.query.initPrompt[0]
     : route.query.initPrompt
@@ -615,6 +762,21 @@ onBeforeUnmount(() => {
     <main class="app-chat-view__workspace">
       <section class="chat-panel">
         <div ref="messageContainerRef" class="chat-panel__messages">
+          <div v-if="hasMoreHistory || historyLoadedCount > 0" class="chat-panel__history-toolbar">
+            <a-button
+              v-if="hasMoreHistory"
+              type="link"
+              class="chat-panel__history-button"
+              :loading="loadingMoreHistory"
+              @click="loadMoreHistoryMessages"
+            >
+              加载更多
+            </a-button>
+            <span v-else class="chat-panel__history-tip">
+              已展示全部 {{ totalHistory || historyLoadedCount }} 条历史消息
+            </span>
+          </div>
+
           <div
             v-for="item in messages"
             :key="item.id"
@@ -645,9 +807,12 @@ onBeforeUnmount(() => {
           </div>
 
           <a-empty
-            v-if="messages.length === 0"
+            v-if="!loadingHistory && messages.length === 0"
             description="输入你的需求后，AI 会在这里实时输出生成过程"
           />
+          <div v-if="loadingHistory && messages.length === 0" class="chat-panel__history-loading">
+            <a-spin />
+          </div>
         </div>
 
         <div class="chat-panel__editor">
@@ -718,7 +883,9 @@ onBeforeUnmount(() => {
         <div class="app-detail__block">
           <h3>应用基础信息</h3>
           <div class="app-detail__creator">
-            <a-avatar :size="44" :src="appCreatorAvatar">{{ appCreatorName.slice(0, 1).toUpperCase() }}</a-avatar>
+            <a-avatar :size="44" :src="appCreatorAvatar">{{
+              appCreatorName.slice(0, 1).toUpperCase()
+            }}</a-avatar>
             <div>
               <p class="app-detail__label">创建者</p>
               <p class="app-detail__value">{{ appCreatorName }}</p>
@@ -815,6 +982,28 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.chat-panel__history-toolbar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.chat-panel__history-button {
+  padding-inline: 0;
+}
+
+.chat-panel__history-tip {
+  color: rgba(15, 23, 42, 0.45);
+  font-size: 12px;
+}
+
+.chat-panel__history-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 180px;
 }
 
 .chat-message {

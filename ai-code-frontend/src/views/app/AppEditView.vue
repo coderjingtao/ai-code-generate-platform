@@ -188,8 +188,12 @@ onMounted(() => {
 
       <a-descriptions title="应用信息" bordered :column="2" size="small">
         <a-descriptions-item label="应用 ID">{{ appInfo?.id ?? '-' }}</a-descriptions-item>
-        <a-descriptions-item label="创建者">{{ appInfo?.user?.userName || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="生成类型">{{ appInfo?.codeGenType || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="创建者">{{
+          appInfo?.user?.userName || '-'
+        }}</a-descriptions-item>
+        <a-descriptions-item label="生成类型">{{
+          appInfo?.codeGenType || '-'
+        }}</a-descriptions-item>
         <a-descriptions-item label="优先级">{{ appInfo?.priority ?? '-' }}</a-descriptions-item>
         <a-descriptions-item label="创建时间">{{ appInfo?.createTime || '-' }}</a-descriptions-item>
         <a-descriptions-item label="更新时间">{{ appInfo?.updateTime || '-' }}</a-descriptions-item>

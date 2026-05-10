@@ -57,6 +57,11 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
     return
   }
 
+  if (key === 'chatManagement') {
+    await router.push('/admin/chatManagement')
+    return
+  }
+
   if (key === 'logout') {
     try {
       const res = await userLogout()
@@ -118,6 +123,7 @@ const goToRegisterPage = () => {
           <a-menu @click="handleUserMenuClick">
             <a-menu-item key="myApps">我的作品</a-menu-item>
             <a-menu-item v-if="isAdmin" key="appManagement">应用管理</a-menu-item>
+            <a-menu-item v-if="isAdmin" key="chatManagement">对话管理</a-menu-item>
             <a-menu-item v-if="isAdmin" key="userManagement">用户管理</a-menu-item>
             <a-menu-divider />
             <a-menu-item key="logout">退出登录</a-menu-item>
