@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore -- openapi generated typing shim
+// @ts-ignore
 /* eslint-disable */
 import request from '@/request'
 
