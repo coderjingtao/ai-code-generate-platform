@@ -28,6 +28,9 @@
     </scm>
     <properties>
         <java.version>25</java.version>
+        <!-- Spring Boot 3.5.13 manages Jedis 6.0.0, but langchain4j-community-redis 1.13.0-beta23
+             is compiled against Jedis 7.2.1 APIs (UnifiedJedis#pipelined returns AbstractPipeline). -->
+        <jedis.version>7.2.1</jedis.version>
     </properties>
     <dependencies>
         <dependency>
@@ -113,6 +116,20 @@
             <artifactId>langchain4j-reactor</artifactId>
             <version>1.13.0-beta23</version>
         </dependency>
+
+        <!-- LangChain Store for Redis -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
+            <version>1.13.0-beta23</version>
+        </dependency>
+
+        <!-- Caffeine Cache -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
 
     </dependencies>
 

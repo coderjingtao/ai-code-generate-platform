@@ -6,6 +6,7 @@ import com.mybatisflex.core.service.IService;
 import dev.jingtao.aicodebackend.model.dto.chathistory.ChatHistoryQueryRequest;
 import dev.jingtao.aicodebackend.model.entity.ChatHistory;
 import dev.jingtao.aicodebackend.model.entity.Users;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 
 import java.time.LocalDateTime;
 
@@ -54,4 +55,13 @@ public interface ChatHistoryService extends IService<ChatHistory> {
     Page<ChatHistory> listAppChatHistoryByPage(Long appId, int pageSize,
                                                LocalDateTime lastCreateTime,
                                                Users loginUser);
+
+    /**
+     * 加载数据库中的ChatHistory到Redis存储中
+     * @param appId 应用ID
+     * @param chatMemory 应用ID对应的记忆空间
+     * @param maxLoadCount 最大加载的条数
+     * @return 成功加载的条数
+     */
+    int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxLoadCount);
 }

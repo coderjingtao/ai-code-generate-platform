@@ -1,6 +1,6 @@
 package dev.jingtao.aicodebackend.core;
 
-import dev.jingtao.aicodebackend.ai.AiCodeGenerateService;
+import dev.jingtao.aicodebackend.ai.AiCodeGenerateServiceFactory;
 import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
 import dev.jingtao.aicodebackend.core.parser.CodeParserExecutor;
@@ -21,7 +21,7 @@ import java.io.File;
 public class AiCodeGeneratorFacade {
 
     @Resource
-    private AiCodeGenerateService aiCodeGenerateService;
+    private AiCodeGenerateServiceFactory aiCodeGenerateServiceFactory;
 
     /**
      * 统一入口：根据代码生成的类型，生成代码并保存到文件
@@ -31,13 +31,14 @@ public class AiCodeGeneratorFacade {
      */
     public File generateAndSaveCode(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
+        var aiService = aiCodeGenerateServiceFactory.getAiService(appId);
         return switch (codeGenTypeEnum){
             case HTML -> {
-                HtmlCodeResult result = aiCodeGenerateService.generateHtmlCode(userPrompt);
+                HtmlCodeResult result = aiService.generateHtmlCode(userPrompt);
                 yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
-                MultiFileCodeResult result = aiCodeGenerateService.generateMultiFileCode(userPrompt);
+                MultiFileCodeResult result = aiService.generateMultiFileCode(userPrompt);
                 yield CodeFileSaverExecutor.executeSaver(result, codeGenTypeEnum, appId);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
@@ -52,13 +53,14 @@ public class AiCodeGeneratorFacade {
      */
     public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
+        var aiService = aiCodeGenerateServiceFactory.getAiService(appId);
         return switch (codeGenTypeEnum){
             case HTML -> {
-                Flux<String> codeStream = aiCodeGenerateService.generateHtmlCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateHtmlCodeStream(userPrompt);
                 yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiCodeGenerateService.generateMultiFileCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateMultiFileCodeStream(userPrompt);
                 yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
