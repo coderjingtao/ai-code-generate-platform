@@ -15,7 +15,6 @@ const chatHistoryList = ref<API.ChatHistory[]>([])
 const searchParams = reactive<API.ChatHistoryQueryRequest>({
   pageNum: 1,
   pageSize: 20,
-  id: undefined,
   message: '',
   messageType: '',
   appId: undefined,
@@ -24,6 +23,12 @@ const searchParams = reactive<API.ChatHistoryQueryRequest>({
   sortField: 'createTime',
   sortOrder: 'descend',
 })
+
+const messageTypeOptions = [
+  { label: '用户', value: 'user' },
+  { label: 'AI', value: 'assistant' },
+  { label: '系统', value: 'system' },
+]
 
 const sortFieldOptions = [
   { label: '记录 ID', value: 'id' },
@@ -102,7 +107,6 @@ const loadData = async () => {
   try {
     const res = await listChatHistoryByPageForAdmin({
       ...searchParams,
-      id: searchParams.id ?? undefined,
       message: searchParams.message?.trim() || undefined,
       messageType: searchParams.messageType?.trim() || undefined,
       appId: searchParams.appId ?? undefined,
@@ -134,7 +138,6 @@ const doSearch = () => {
 const doReset = () => {
   searchParams.pageNum = 1
   searchParams.pageSize = 20
-  searchParams.id = undefined
   searchParams.message = ''
   searchParams.messageType = ''
   searchParams.appId = undefined
@@ -169,15 +172,6 @@ onMounted(() => {
     <a-card class="query-section" :bordered="false">
       <h2 class="section-title">查询区</h2>
       <a-form layout="inline" class="query-form" :model="searchParams" @finish="doSearch">
-        <a-form-item label="ID">
-          <a-input-number
-            v-model:value="searchParams.id"
-            :min="1"
-            placeholder="记录 ID"
-            style="width: 140px"
-          />
-        </a-form-item>
-
         <a-form-item label="应用 ID">
           <a-input
             v-model:value="searchParams.appId"
@@ -197,10 +191,11 @@ onMounted(() => {
         </a-form-item>
 
         <a-form-item label="消息类型">
-          <a-input
+          <a-select
             v-model:value="searchParams.messageType"
             allow-clear
-            placeholder="例如 user / assistant"
+            :options="messageTypeOptions"
+            placeholder="请选择消息类型"
             style="width: 180px"
           />
         </a-form-item>
@@ -215,10 +210,13 @@ onMounted(() => {
         </a-form-item>
 
         <a-form-item label="游标时间">
-          <a-input
+          <a-date-picker
             v-model:value="searchParams.lastCreateTime"
             allow-clear
-            placeholder="例如 2026-05-10 12:00:00"
+            show-time
+            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY-MM-DD HH:mm:ss"
+            placeholder="请选择游标时间"
             style="width: 220px"
           />
         </a-form-item>

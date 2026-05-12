@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
 import { deleteAppByAdmin, listAppByPageForAdmin, updateAppByAdmin } from '@/api/appController'
+import { CODE_GEN_TYPE_CONFIG } from '@/utils/codeGenTypes'
 
 const router = useRouter()
 
@@ -19,15 +20,17 @@ const searchParams = reactive<API.AppQueryRequest>({
   pageSize: 20,
   id: undefined,
   appName: '',
-  cover: '',
-  initPrompt: '',
   codeGenType: '',
-  deployKey: '',
   priority: undefined,
   userId: undefined,
   sortField: '',
   sortOrder: '',
 })
+
+const codeGenTypeOptions = Object.values(CODE_GEN_TYPE_CONFIG).map(({ label, value }) => ({
+  label,
+  value,
+}))
 
 const sortFieldOptions = [
   { label: '应用 ID', value: 'id' },
@@ -61,9 +64,9 @@ const columns: TableColumnsType<API.AppVO> = [
     width: 180,
   },
   {
-    title: '部署标识',
+    title: '部署',
     dataIndex: 'deployKey',
-    width: 150,
+    width: 100,
   },
   {
     title: '优先级',
@@ -84,9 +87,14 @@ const columns: TableColumnsType<API.AppVO> = [
     title: '操作',
     key: 'action',
     fixed: 'right',
-    width: 250,
+    width: 160,
   },
 ]
+
+const tableScrollX = columns.reduce(
+  (totalWidth, column) => totalWidth + (typeof column.width === 'number' ? column.width : 0),
+  0,
+)
 
 const loadData = async () => {
   loading.value = true
@@ -95,10 +103,7 @@ const loadData = async () => {
       ...searchParams,
       id: searchParams.id ?? undefined,
       appName: searchParams.appName?.trim() || undefined,
-      cover: searchParams.cover?.trim() || undefined,
-      initPrompt: searchParams.initPrompt?.trim() || undefined,
       codeGenType: searchParams.codeGenType?.trim() || undefined,
-      deployKey: searchParams.deployKey?.trim() || undefined,
       sortField: searchParams.sortField?.trim() || undefined,
       sortOrder: searchParams.sortOrder?.trim() || undefined,
     })
@@ -127,10 +132,7 @@ const doReset = () => {
   searchParams.pageSize = 20
   searchParams.id = undefined
   searchParams.appName = ''
-  searchParams.cover = ''
-  searchParams.initPrompt = ''
   searchParams.codeGenType = ''
-  searchParams.deployKey = ''
   searchParams.priority = undefined
   searchParams.userId = undefined
   searchParams.sortField = ''
@@ -240,38 +242,12 @@ onMounted(() => {
           />
         </a-form-item>
 
-        <a-form-item label="封面">
-          <a-input
-            v-model:value="searchParams.cover"
-            allow-clear
-            placeholder="封面 URL"
-            style="width: 180px"
-          />
-        </a-form-item>
-
-        <a-form-item label="初始提示词">
-          <a-input
-            v-model:value="searchParams.initPrompt"
-            allow-clear
-            placeholder="初始提示词"
-            style="width: 210px"
-          />
-        </a-form-item>
-
         <a-form-item label="生成类型">
-          <a-input
+          <a-select
             v-model:value="searchParams.codeGenType"
             allow-clear
-            placeholder="codeGenType"
-            style="width: 160px"
-          />
-        </a-form-item>
-
-        <a-form-item label="部署标识">
-          <a-input
-            v-model:value="searchParams.deployKey"
-            allow-clear
-            placeholder="deployKey"
+            :options="codeGenTypeOptions"
+            placeholder="请选择生成类型"
             style="width: 160px"
           />
         </a-form-item>
@@ -340,7 +316,7 @@ onMounted(() => {
           showTotal: (count: number) => `共 ${count} 条`,
           pageSizeOptions: ['20', '50', '100', '200'],
         }"
-        :scroll="{ x: 1840 }"
+        :scroll="{ x: tableScrollX }"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -355,16 +331,26 @@ onMounted(() => {
             {{ record.user?.userName || '-' }}
           </template>
 
+          <template v-else-if="column.dataIndex === 'deployKey'">
+            <a-tag v-if="record.deployKey?.trim()" color="success">已部署</a-tag>
+            <span v-else>未部署</span>
+          </template>
+
           <template v-else-if="column.dataIndex === 'priority'">
             <a-tag v-if="record.priority === 99" color="gold">精选</a-tag>
             <span v-else>{{ record.priority ?? '-' }}</span>
           </template>
 
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openDetailPage(record)">详情</a-button>
-              <a-button type="link" @click="openEditPage(record)">编辑</a-button>
+            <div class="action-group">
+              <a-button class="action-button" type="link" @click="openDetailPage(record)">
+                详情
+              </a-button>
+              <a-button class="action-button" type="link" @click="openEditPage(record)">
+                编辑
+              </a-button>
               <a-button
+                class="action-button"
                 type="link"
                 :loading="featuringId === record.id"
                 @click="setFeatured(record)"
@@ -377,9 +363,16 @@ onMounted(() => {
                 cancel-text="取消"
                 @confirm="deleteById(record)"
               >
-                <a-button type="link" danger :loading="deletingId === record.id">删除</a-button>
+                <a-button
+                  class="action-button"
+                  type="link"
+                  danger
+                  :loading="deletingId === record.id"
+                >
+                  删除
+                </a-button>
               </a-popconfirm>
-            </a-space>
+            </div>
           </template>
         </template>
       </a-table>
@@ -443,6 +436,17 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.action-button {
+  padding-inline: 2px;
 }
 
 .truncate-text {
