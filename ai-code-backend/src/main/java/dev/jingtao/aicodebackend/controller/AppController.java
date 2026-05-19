@@ -9,8 +9,12 @@ import dev.jingtao.aicodebackend.common.DeleteRequest;
 import dev.jingtao.aicodebackend.common.ResultUtils;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.constant.UserConstant;
+import dev.jingtao.aicodebackend.exception.AiRateLimitError;
+import dev.jingtao.aicodebackend.exception.AiServiceUnavailableError;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
+import dev.langchain4j.exception.HttpException;
+import dev.langchain4j.exception.RateLimitException;
 import dev.jingtao.aicodebackend.model.dto.app.*;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
@@ -19,6 +23,7 @@ import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.UsersService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -77,7 +82,24 @@ public class AppController {
                                 .event("done")
                                 .data("")
                                 .build()
-                ));
+                ))
+                .onErrorResume(RateLimitException.class, e -> Mono.just(
+                        ServerSentEvent.<String>builder()
+                                .event("error")
+                                .data(JSONUtil.toJsonStr(AiRateLimitError.from(e)))
+                                .build()
+                ))
+                .onErrorResume(HttpException.class, e -> {
+                    if (e.statusCode() != HttpStatus.SERVICE_UNAVAILABLE.value()) {
+                        return Mono.error(e);
+                    }
+                    return Mono.just(
+                            ServerSentEvent.<String>builder()
+                                    .event("error")
+                                    .data(JSONUtil.toJsonStr(AiServiceUnavailableError.create()))
+                                    .build()
+                    );
+                });
     }
 
     /**

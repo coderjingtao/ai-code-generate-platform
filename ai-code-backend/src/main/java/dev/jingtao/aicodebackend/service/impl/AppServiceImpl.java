@@ -9,6 +9,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
+import dev.jingtao.aicodebackend.core.handler.StreamHandlerExecutor;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
@@ -54,6 +55,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private final UsersService usersService;
     private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
     private final ChatHistoryService chatHistoryService;
+    private final StreamHandlerExecutor streamHandlerExecutor;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser) {
@@ -74,26 +76,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 6.调用 AI 生成代码（流式）
         Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId);
         // 7.收集AI响应内容并在完成后添加到对话历史中
-        StringBuilder aiMessageBuilder = new StringBuilder();
-        return codeStream
-                .map(chunk -> {
-                    // 收集 AI 响应内容
-                    aiMessageBuilder.append(chunk);
-                    return chunk;
-                })
-                .doOnComplete(() -> {
-                   // AI 流式响应完成后，添加AI消息到对话历史
-                   String aiMessage = aiMessageBuilder.toString();
-                   if(StrUtil.isNotBlank(aiMessage)) {
-                       chatHistoryService.addChatHistory(appId, aiMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                   }
-                })
-                .doOnError(error -> {
-                    // 如果 AI 回复失败，也要记录错误信息
-                    String aiErrorMessage = "AI response failed: " + error.getMessage();
-                    chatHistoryService.addChatHistory(appId, aiErrorMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                    log.error("AI response failed: {}", error.getMessage());
-                });
+        return streamHandlerExecutor.doExecute(codeStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
     }
 
     @Override
@@ -107,7 +90,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         BeanUtils.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
+        app.setCodeGenType(CodeGenTypeEnum.VUE_PROJECT.getValue());
         app.setInitPrompt(appAddRequest.getInitPrompt());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
         // 保存到数据库
