@@ -124,6 +124,8 @@ public class AiCodeGeneratorFacade {
             .onCompleteResponse(response -> {
                 sink.complete();
             })
+                    //todo
+            .onPartialThinking(System.out::println)
             .onError(error -> {
                 log.error("AI response error: {}", error.getMessage(), error);
                 sink.error(error);
