@@ -13,7 +13,8 @@ import java.util.stream.Stream;
 public enum StreamMessageTypeEnum {
     AI_RESPONSE("AI响应","ai_response"),
     TOOL_CALL("工具执行请求","tool_call"),
-    TOOL_EXECUTED("工具执行结果","tool_executed")
+    TOOL_EXECUTED("工具执行结果","tool_executed"),
+    PARTIAL_THINKING("中间思考消息","partial_thinking")
     ;
     private final String desc;
     private final String value;

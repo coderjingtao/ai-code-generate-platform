@@ -27,6 +27,7 @@ import dev.jingtao.aicodebackend.model.vo.AppVO;
 import dev.jingtao.aicodebackend.model.vo.UserVO;
 import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
+import dev.jingtao.aicodebackend.service.ScreenshotService;
 import dev.jingtao.aicodebackend.service.UsersService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private final ChatHistoryService chatHistoryService;
     private final StreamHandlerExecutor streamHandlerExecutor;
     private final VueProjectBuilder vueProjectBuilder;
+    private final ScreenshotService screenshotService;
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser) {
@@ -150,7 +152,30 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR,"更新应用部署信息失败");
         // 构建应用访问 URL
         String appDeployUrl = String.format("%s/%s",AppConstant.CODE_DEPLOY_HOST, deployKey);
+        // 异步上传应用封面，避免阻塞用户的部署
+        generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
+    }
+
+    /**
+     * 异步生成应用截图并更新封面
+     *
+     * @param appId  应用ID
+     * @param appUrl 应用访问URL
+     */
+    @Override
+    public void generateAppScreenshotAsync(Long appId, String appUrl) {
+        // 使用虚拟线程
+        Thread.startVirtualThread(()-> {
+           // 调用截图服务生成截图并上传对象存储
+            String screenshotUrl = screenshotService.takeAndUploadScreenshot(appUrl);
+            // 更新应用的封面到数据库
+            App updateApp = new App();
+            updateApp.setId(appId);
+            updateApp.setCover(screenshotUrl);
+            boolean updated = this.updateById(updateApp);
+            ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "更新应用封面字段失败");
+        });
     }
 
     @Override

@@ -100,4 +100,6 @@ public interface AppService extends IService<App> {
     List<AppVO> getAppVOList(List<App> appList);
 
     QueryWrapper getAppQueryWrapper(AppQueryRequest appQueryRequest);
+
+    void generateAppScreenshotAsync(Long appId, String appUrl);
 }

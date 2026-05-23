@@ -101,7 +101,7 @@ public class JsonMessageStreamHandler {
                 if (toolId != null && !seenToolIds.contains(toolId)) {
                     //第一次调用该工具，记录这个工具ID
                     seenToolIds.add(toolId);
-                    return "\n\n [⚙️选择工具: " + toolName + " 写入文件]\n\n";
+                    return "\n [⚙️选择工具: " + toolName + " 写入文件]\n";
                 } else{
                     // 不是第一次调用该工具
                     return StrUtil.EMPTY;
@@ -125,9 +125,12 @@ public class JsonMessageStreamHandler {
                                 """, relativeFilePath, suffix, content
                 );
                 //输出前端和要持久化的内容
-                String output = String.format("\n\n%s\n\n", result);
+                String output = String.format("\n%s\n", result);
                 aiMessageBuilder.append(output);
                 return output;
+            }
+            case PARTIAL_THINKING -> {
+                return StrUtil.EMPTY;
             }
             default -> {
                 log.error("Unknown message type: {}", messageType);

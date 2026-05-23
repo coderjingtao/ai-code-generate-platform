@@ -5,6 +5,7 @@ import dev.jingtao.aicodebackend.ai.AiCodeGenerateServiceFactory;
 import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
 import dev.jingtao.aicodebackend.ai.model.message.AiResponseMessage;
+import dev.jingtao.aicodebackend.ai.model.message.PartialThinkingMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ToolCallMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ToolExecutedMessage;
 import dev.jingtao.aicodebackend.core.parser.CodeParserExecutor;
@@ -117,6 +118,10 @@ public class AiCodeGeneratorFacade {
                 ToolCallMessage toolCallMessage = new ToolCallMessage(partialToolCall);
                 sink.next(JSONUtil.toJsonStr(toolCallMessage));
             })
+            .onPartialThinking(partialThinking -> {
+                PartialThinkingMessage partialThinkingMessage = new PartialThinkingMessage(partialThinking);
+                sink.next(JSONUtil.toJsonStr(partialThinkingMessage));
+            })
             .onToolExecuted(toolExecution -> {
                 ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
                 sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
@@ -124,8 +129,6 @@ public class AiCodeGeneratorFacade {
             .onCompleteResponse(response -> {
                 sink.complete();
             })
-                    //todo
-            .onPartialThinking(System.out::println)
             .onError(error -> {
                 log.error("AI response error: {}", error.getMessage(), error);
                 sink.error(error);
