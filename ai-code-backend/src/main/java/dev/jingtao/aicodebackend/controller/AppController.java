@@ -9,20 +9,19 @@ import dev.jingtao.aicodebackend.common.DeleteRequest;
 import dev.jingtao.aicodebackend.common.ResultUtils;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.constant.UserConstant;
-import dev.jingtao.aicodebackend.exception.AiRateLimitError;
-import dev.jingtao.aicodebackend.exception.AiServiceUnavailableError;
-import dev.jingtao.aicodebackend.exception.ErrorCode;
-import dev.jingtao.aicodebackend.exception.ThrowUtils;
-import dev.langchain4j.exception.HttpException;
-import dev.langchain4j.exception.RateLimitException;
+import dev.jingtao.aicodebackend.exception.*;
 import dev.jingtao.aicodebackend.model.dto.app.*;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.vo.AppVO;
 import dev.jingtao.aicodebackend.service.AppService;
+import dev.jingtao.aicodebackend.service.ProjectDownloadService;
 import dev.jingtao.aicodebackend.service.UsersService;
+import dev.langchain4j.exception.HttpException;
+import dev.langchain4j.exception.RateLimitException;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -30,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +49,9 @@ public class AppController {
 
     @Resource
     private UsersService usersService;
+
+    @Resource
+    private ProjectDownloadService projectDownloadService;
 
     /**
      * 用户提示词生成应用，并流式返回给前端
@@ -273,5 +276,30 @@ public class AppController {
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
         AppVO appVO = appService.getAppVO(app);
         return ResultUtils.success(appVO);
+    }
+
+    @GetMapping("/download/{appId}")
+    public void downloadAppCode(@PathVariable Long appId, HttpServletRequest request, HttpServletResponse response) {
+        // 1.基础校验
+        ThrowUtils.throwIf(appId == null || appId < 0, ErrorCode.PARAMS_ERROR, "Invalid app id");
+        // 2.查询应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App Not Found");
+        // 3.权限校验，只有应用创建者才可以下载
+        Users loginUser = usersService.getLoginUser(request);
+        if(!app.getUserId().equals(loginUser.getId())){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "No permission to download this app's code");
+        }
+        // 4.构建应用代码目录路径（生成目录，非部署目录）
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        // 5.检查代码目录是否存在
+        File sourceDir = new File(sourceDirPath);
+        ThrowUtils.throwIf(!sourceDir.exists() || !sourceDir.isDirectory(), ErrorCode.NOT_FOUND_ERROR, "App Code Not Found");
+        // 6.生成下载文件名
+        String downloadFileName = String.valueOf(appId);
+        // 7.调用通用下载服务
+        projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
     }
 }
