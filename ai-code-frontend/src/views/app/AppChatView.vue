@@ -9,6 +9,7 @@ import {
   deleteAppByAdmin,
   deleteMyApp,
   deployApp,
+  downloadAppCode,
   getAppByIdForAdmin,
   getMyAppById,
 } from '@/api/appController'
@@ -30,6 +31,9 @@ interface RenderSegment {
   language?: string
 }
 
+type WithStringAppId<T> = Omit<T, 'appId'> & { appId: string }
+type WithStringId<T> = Omit<T, 'id'> & { id: string }
+
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -39,6 +43,7 @@ const appInfo = ref<API.AppVO>()
 const loadingApp = ref(false)
 const sending = ref(false)
 const deploying = ref(false)
+const downloadingCode = ref(false)
 const previewReady = ref(false)
 const previewUrl = ref('')
 const inputPrompt = ref('')
@@ -108,6 +113,14 @@ const getMessageAvatarFallback = (role: ChatMessage['role']) => {
 
 const isHistoryMessage = (messageItem: ChatMessage) => {
   return messageItem.id.startsWith('history-')
+}
+
+const withStringAppId = <T extends { appId?: unknown }>(params: WithStringAppId<T>) => {
+  return params as unknown as T
+}
+
+const withStringId = <T extends { id: unknown }>(params: WithStringId<T>) => {
+  return params as unknown as T
 }
 
 const compareCreateTime = (left?: string, right?: string) => {
@@ -212,11 +225,13 @@ const loadChatHistory = async (loadMore = false) => {
   const previousScrollTop = box?.scrollTop ?? 0
 
   try {
-    const res = await listAppChatHistory({
-      appId: currentAppId,
-      pageSize: HISTORY_PAGE_SIZE,
-      lastCreateTime: loadMore ? historyCursor.value : undefined,
-    })
+    const res = await listAppChatHistory(
+      withStringAppId<API.listAppChatHistoryParams>({
+        appId: currentAppId,
+        pageSize: HISTORY_PAGE_SIZE,
+        lastCreateTime: loadMore ? historyCursor.value : undefined,
+      }),
+    )
 
     if (res.data.code === 0 && res.data.data) {
       const records = res.data.data.records ?? []
@@ -294,8 +309,8 @@ const loadAppInfo = async () => {
     const useAdminApi = await ensureAdminMode()
     adminModeEnabled.value = useAdminApi
     const res = useAdminApi
-      ? await getAppByIdForAdmin({ id: appId.value })
-      : await getMyAppById({ id: appId.value })
+      ? await getAppByIdForAdmin(withStringId<API.getAppByIdForAdminParams>({ id: appId.value }))
+      : await getMyAppById(withStringId<API.getMyAppByIdParams>({ id: appId.value }))
     if (res.data.code === 0 && res.data.data) {
       appInfo.value = res.data.data
       if (res.data.data.codeGenType) {
@@ -632,7 +647,7 @@ const handleDeploy = async () => {
 
   deploying.value = true
   try {
-    const res = await deployApp({ appId: appId.value })
+    const res = await deployApp(withStringAppId<API.AppDeployRequest>({ appId: appId.value }))
     if (res.data.code === 0 && res.data.data) {
       deployedUrl.value = res.data.data
       deployModalOpen.value = true
@@ -664,6 +679,63 @@ const openDeployUrl = () => {
     return
   }
   window.open(deployedUrl.value, '_blank')
+}
+
+const decodeFileName = (fileName: string) => {
+  try {
+    return decodeURIComponent(fileName)
+  } catch {
+    return fileName
+  }
+}
+
+const parseDownloadFileName = (contentDisposition?: string) => {
+  if (!contentDisposition) {
+    return ''
+  }
+
+  const utf8FileNameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8FileNameMatch?.[1]) {
+    return decodeFileName(utf8FileNameMatch[1])
+  }
+
+  const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
+  return fileNameMatch?.[1] ? decodeFileName(fileNameMatch[1]) : ''
+}
+
+const saveBlobAsFile = (blob: Blob, fileName: string) => {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(objectUrl)
+}
+
+const handleDownloadCode = async () => {
+  if (!appId.value) {
+    message.error('应用 ID 不合法')
+    return
+  }
+
+  downloadingCode.value = true
+  try {
+    const res = await downloadAppCode(
+      withStringAppId<API.downloadAppCodeParams>({ appId: appId.value }),
+      { responseType: 'blob' },
+    )
+    const contentDisposition = res.headers['content-disposition']
+    const fileName = parseDownloadFileName(contentDisposition) || `${appName.value}.zip`
+    const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/zip' })
+    saveBlobAsFile(blob, fileName)
+    message.success('代码下载已开始')
+  } catch {
+    message.error('下载代码失败，请稍后重试')
+  } finally {
+    downloadingCode.value = false
+  }
 }
 
 const openAppDetail = () => {
@@ -755,6 +827,7 @@ onBeforeUnmount(() => {
       <a-space>
         <a-button @click="router.push('/')">返回首页</a-button>
         <a-button @click="openAppDetail">应用详情</a-button>
+        <a-button :loading="downloadingCode" @click="handleDownloadCode">下载代码</a-button>
         <a-button type="primary" :loading="deploying" @click="handleDeploy">部署应用</a-button>
       </a-space>
     </header>

@@ -17,6 +17,8 @@ interface EditForm {
   priority: number | undefined
 }
 
+type WithStringId<T> = Omit<T, 'id'> & { id: string }
+
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -45,6 +47,10 @@ const isAdminEdit = computed(() => adminEditMode.value)
 
 const pageTitle = computed(() => (isAdminEdit.value ? '编辑应用（管理员）' : '编辑我的作品'))
 
+const withStringId = <T extends { id?: unknown }>(params: WithStringId<T>) => {
+  return params as unknown as T
+}
+
 const ensureAdminEditMode = async () => {
   if (!adminQueryEnabled.value) {
     return false
@@ -69,8 +75,8 @@ const loadAppDetail = async () => {
     const useAdminApi = await ensureAdminEditMode()
     adminEditMode.value = useAdminApi
     const res = useAdminApi
-      ? await getAppByIdForAdmin({ id: appId.value })
-      : await getMyAppById({ id: appId.value })
+      ? await getAppByIdForAdmin(withStringId<API.getAppByIdForAdminParams>({ id: appId.value }))
+      : await getMyAppById(withStringId<API.getMyAppByIdParams>({ id: appId.value }))
 
     if (res.data.code === 0 && res.data.data) {
       appInfo.value = res.data.data
@@ -103,12 +109,14 @@ const submitForm = async () => {
   submitting.value = true
   try {
     if (isAdminEdit.value) {
-      const res = await updateAppByAdmin({
-        id: appId.value,
-        appName: trimmedName,
-        cover: formState.cover.trim() || undefined,
-        priority: formState.priority,
-      })
+      const res = await updateAppByAdmin(
+        withStringId<API.AppAdminUpdateRequest>({
+          id: appId.value,
+          appName: trimmedName,
+          cover: formState.cover.trim() || undefined,
+          priority: formState.priority,
+        }),
+      )
 
       if (res.data.code === 0) {
         message.success('更新应用成功')
@@ -120,10 +128,12 @@ const submitForm = async () => {
       return
     }
 
-    const res = await updateMyApp({
-      id: appId.value,
-      appName: trimmedName,
-    })
+    const res = await updateMyApp(
+      withStringId<API.AppUpdateRequest>({
+        id: appId.value,
+        appName: trimmedName,
+      }),
+    )
 
     if (res.data.code === 0) {
       message.success('更新应用成功')
