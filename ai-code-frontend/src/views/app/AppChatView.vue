@@ -821,7 +821,11 @@ onBeforeUnmount(() => {
       <div>
         <h1 class="app-chat-view__title">{{ appName }}</h1>
         <p class="app-chat-view__meta">
-          应用 ID：{{ appId }} · 生成类型：{{ appInfo?.codeGenType || '-' }}
+          <span>应用 ID：{{ appId }}</span>
+          <span class="app-chat-view__meta-separator">·</span>
+          <span>
+            生成类型：<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
+          </span>
         </p>
       </div>
       <a-space>
@@ -965,6 +969,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <p class="app-detail__time">创建时间：{{ appInfo?.createTime || '-' }}</p>
+          <p class="app-detail__meta">
+            生成类型：<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
+          </p>
         </div>
 
         <div v-if="canManageApp" class="app-detail__block">
@@ -1022,6 +1029,26 @@ onBeforeUnmount(() => {
   margin: 6px 0 0;
   color: rgba(15, 23, 42, 0.56);
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app-chat-view__meta-separator {
+  color: rgba(15, 23, 42, 0.32);
+}
+
+.app-chat-view__code-type {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(22, 119, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(22, 119, 255, 0.1);
+  color: #1668dc;
+  padding: 2px 8px;
+  line-height: 1.45;
+  font-weight: 700;
 }
 
 .app-chat-view__workspace {
@@ -1297,6 +1324,12 @@ onBeforeUnmount(() => {
 
 .app-detail__time {
   margin: 12px 0 0;
+  color: rgba(15, 23, 42, 0.66);
+  font-size: 13px;
+}
+
+.app-detail__meta {
+  margin: 8px 0 0;
   color: rgba(15, 23, 42, 0.66);
   font-size: 13px;
 }
