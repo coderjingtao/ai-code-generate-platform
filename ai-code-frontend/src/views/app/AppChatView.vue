@@ -16,6 +16,13 @@ import {
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 import { getStaticPreviewUrl } from '@/config/env'
+import {
+  buildPreviewSrcDoc,
+  buildVisualEditPrompt,
+  createVisualIframeEditor,
+  type VisualEditElementInfo,
+  type VisualIframeEditor,
+} from '@/utils/visualEdit'
 
 interface ChatMessage {
   id: string
@@ -46,9 +53,11 @@ const deploying = ref(false)
 const downloadingCode = ref(false)
 const previewReady = ref(false)
 const previewUrl = ref('')
+const previewSrcDoc = ref('')
 const inputPrompt = ref('')
 const messages = ref<ChatMessage[]>([])
 const messageContainerRef = ref<HTMLElement>()
+const previewIframeRef = ref<HTMLIFrameElement>()
 const eventSourceRef = ref<EventSource | null>(null)
 const loadingHistory = ref(false)
 const loadingMoreHistory = ref(false)
@@ -61,7 +70,12 @@ const deployModalOpen = ref(false)
 const deployedUrl = ref('')
 const appDetailOpen = ref(false)
 const deletingApp = ref(false)
+const visualEditMode = ref(false)
+const hoverElementInfo = ref<VisualEditElementInfo | null>(null)
+const selectedElementInfo = ref<VisualEditElementInfo | null>(null)
+const visualIframeEditorRef = ref<VisualIframeEditor | null>(null)
 const CHAT_STREAM_PATH = '/app/chat/gen/code'
+let previewSrcDocLoadToken = 0
 
 const appId = computed(() => {
   const rawId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
@@ -101,6 +115,37 @@ const appCreatorAvatar = computed(() => {
     return loginUserStore.loginUser.userAvatar
   }
   return ''
+})
+const selectedElementTitle = computed(() => {
+  const elementInfo = selectedElementInfo.value
+  if (!elementInfo) {
+    return ''
+  }
+
+  const elementName = elementInfo.id
+    ? `${elementInfo.tagName}#${elementInfo.id}`
+    : elementInfo.className
+      ? `${elementInfo.tagName}.${elementInfo.className.split(/\s+/)[0]}`
+      : elementInfo.tagName
+  return `已选中元素：${elementName}`
+})
+const selectedElementDescription = computed(() => {
+  const elementInfo = selectedElementInfo.value
+  if (!elementInfo) {
+    return ''
+  }
+
+  const text = elementInfo.text ? `；文本：${elementInfo.text}` : ''
+  return `选择器：${elementInfo.selector}${text}`
+})
+const activeHoverElementInfo = computed(() => {
+  if (!hoverElementInfo.value) {
+    return null
+  }
+  if (selectedElementInfo.value?.selector === hoverElementInfo.value.selector) {
+    return null
+  }
+  return hoverElementInfo.value
 })
 
 const getMessageAvatar = (role: ChatMessage['role']) => {
@@ -205,6 +250,91 @@ const closeStream = () => {
   }
 }
 
+const destroyVisualIframeEditor = () => {
+  visualIframeEditorRef.value?.destroy()
+  visualIframeEditorRef.value = null
+}
+
+const setupVisualIframeEditor = () => {
+  destroyVisualIframeEditor()
+
+  if (!previewIframeRef.value || !previewReady.value || !previewUrl.value) {
+    return false
+  }
+
+  visualIframeEditorRef.value = createVisualIframeEditor({
+    iframe: previewIframeRef.value,
+    onHover: (elementInfo) => {
+      hoverElementInfo.value = elementInfo
+    },
+    onSelect: (elementInfo) => {
+      selectedElementInfo.value = elementInfo
+    },
+  })
+
+  return visualEditMode.value ? visualIframeEditorRef.value.enable() : true
+}
+
+const handlePreviewLoad = () => {
+  const setupSucceeded = setupVisualIframeEditor()
+  if (visualEditMode.value && !setupSucceeded) {
+    message.warning('预览页面暂时无法进入可视化编辑模式')
+    visualEditMode.value = false
+  }
+}
+
+const toggleVisualEditMode = () => {
+  if (!previewReady.value || !previewUrl.value) {
+    message.warning('预览生成完成后才能进入编辑模式')
+    return
+  }
+
+  if (!visualEditMode.value) {
+    const enabled = visualIframeEditorRef.value?.enable() || setupVisualIframeEditor()
+    if (!enabled) {
+      message.warning('预览页面暂时无法进入可视化编辑模式')
+      return
+    }
+    visualEditMode.value = true
+    message.info('已进入可视化编辑模式，点击预览中的元素即可选中')
+    return
+  }
+
+  visualEditMode.value = false
+  hoverElementInfo.value = null
+  visualIframeEditorRef.value?.disable()
+}
+
+const clearSelectedElement = () => {
+  selectedElementInfo.value = null
+  visualIframeEditorRef.value?.clearSelected()
+}
+
+const resetVisualEditState = () => {
+  visualEditMode.value = false
+  hoverElementInfo.value = null
+  clearSelectedElement()
+  visualIframeEditorRef.value?.disable()
+}
+
+const getVisualEditBoxStyle = (elementInfo: VisualEditElementInfo) => ({
+  transform: `translate(${elementInfo.rect.x}px, ${elementInfo.rect.y}px)`,
+  width: `${Math.max(elementInfo.rect.width, 1)}px`,
+  height: `${Math.max(elementInfo.rect.height, 1)}px`,
+})
+
+const handleVisualEditPointerMove = (event: MouseEvent) => {
+  visualIframeEditorRef.value?.handlePointerMove(event)
+}
+
+const handleVisualEditPointerLeave = () => {
+  visualIframeEditorRef.value?.handlePointerLeave()
+}
+
+const handleVisualEditClick = (event: MouseEvent) => {
+  visualIframeEditorRef.value?.handleClick(event)
+}
+
 const loadChatHistory = async (loadMore = false) => {
   const currentAppId = appId.value
   if (!currentAppId) {
@@ -279,10 +409,39 @@ const buildPreviewUrl = (codeGenType?: string) => {
   return getStaticPreviewUrl(finalCodeGenType, appId.value)
 }
 
+const loadPreviewSrcDoc = async (url: string) => {
+  const currentToken = ++previewSrcDocLoadToken
+  previewSrcDoc.value = ''
+
+  if (!url) {
+    return
+  }
+
+  try {
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      throw new Error(`Preview HTML request failed: ${res.status}`)
+    }
+
+    const html = await res.text()
+    if (currentToken !== previewSrcDocLoadToken) {
+      return
+    }
+
+    const baseUrl = new URL(url, window.location.href).href
+    previewSrcDoc.value = buildPreviewSrcDoc(html, baseUrl)
+  } catch {
+    if (currentToken === previewSrcDocLoadToken) {
+      previewSrcDoc.value = ''
+    }
+  }
+}
+
 const refreshPreview = (codeGenType?: string) => {
   const nextUrl = buildPreviewUrl(codeGenType)
   previewUrl.value = nextUrl
   previewReady.value = Boolean(nextUrl)
+  void loadPreviewSrcDoc(nextUrl)
 }
 
 const ensureAdminMode = async () => {
@@ -534,6 +693,8 @@ const sendPrompt = async (promptInput?: string) => {
   }
 
   closeStream()
+  const selectedElementSnapshot = selectedElementInfo.value
+  const finalPrompt = buildVisualEditPrompt(prompt, selectedElementSnapshot)
 
   const userMessage: ChatMessage = {
     id: `user-${Date.now()}`,
@@ -549,15 +710,19 @@ const sendPrompt = async (promptInput?: string) => {
 
   messages.value.push(userMessage, assistantMessage)
   inputPrompt.value = ''
+  resetVisualEditState()
   sending.value = true
   previewReady.value = false
   previewUrl.value = ''
+  previewSrcDoc.value = ''
+  previewSrcDocLoadToken += 1
+  destroyVisualIframeEditor()
   await scrollToBottom()
 
   const assistantIndex = messages.value.length - 1
   const params = new URLSearchParams({
     appId: appId.value,
-    userPrompt: prompt,
+    userPrompt: finalPrompt,
   })
   const streamUrl = `${baseApiUrl.value}${CHAT_STREAM_PATH}?${params.toString()}`
   const source = new EventSource(streamUrl, { withCredentials: true })
@@ -812,6 +977,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   closeStream()
+  destroyVisualIframeEditor()
 })
 </script>
 
@@ -824,7 +990,9 @@ onBeforeUnmount(() => {
           <span>应用 ID：{{ appId }}</span>
           <span class="app-chat-view__meta-separator">·</span>
           <span>
-            生成类型：<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
+            生成类型：<strong class="app-chat-view__code-type">{{
+              appInfo?.codeGenType || '-'
+            }}</strong>
           </span>
         </p>
       </div>
@@ -893,6 +1061,16 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="chat-panel__editor">
+          <a-alert
+            v-if="selectedElementInfo"
+            class="chat-panel__selected-element"
+            type="info"
+            show-icon
+            closable
+            :message="selectedElementTitle"
+            :description="selectedElementDescription"
+            @close="clearSelectedElement"
+          />
           <a-textarea
             v-model:value="inputPrompt"
             :auto-size="{ minRows: 3, maxRows: 6 }"
@@ -909,18 +1087,50 @@ onBeforeUnmount(() => {
       <aside class="preview-panel">
         <div class="preview-panel__header">
           <h2>网页预览</h2>
-          <a
-            :href="previewUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            v-if="previewReady && previewUrl"
-          >
-            新窗口打开
-          </a>
+          <div v-if="previewReady && previewUrl" class="preview-panel__actions">
+            <a-button
+              size="small"
+              :type="visualEditMode ? 'primary' : 'default'"
+              :disabled="sending"
+              @click="toggleVisualEditMode"
+            >
+              {{ visualEditMode ? '退出编辑' : '编辑模式' }}
+            </a-button>
+            <a :href="previewUrl" target="_blank" rel="noopener noreferrer"> 新窗口打开 </a>
+          </div>
         </div>
-        <div class="preview-panel__body">
-          <iframe v-if="previewReady && previewUrl" :src="previewUrl" title="preview" />
-          <div v-else class="preview-placeholder">
+        <div
+          class="preview-panel__body"
+          :class="{ 'preview-panel__body--visual-editing': visualEditMode }"
+        >
+          <iframe
+            v-if="previewReady && previewUrl"
+            ref="previewIframeRef"
+            :src="previewUrl"
+            :srcdoc="previewSrcDoc || undefined"
+            title="preview"
+            @load="handlePreviewLoad"
+          />
+          <div
+            v-if="previewReady && previewUrl && visualEditMode"
+            class="preview-panel__visual-edit-layer"
+            @pointermove="handleVisualEditPointerMove"
+            @pointerleave="handleVisualEditPointerLeave"
+            @pointerdown.prevent.stop="handleVisualEditClick"
+            @click.prevent.stop
+          >
+            <div
+              v-if="activeHoverElementInfo"
+              class="preview-panel__visual-edit-box preview-panel__visual-edit-box--hover"
+              :style="getVisualEditBoxStyle(activeHoverElementInfo)"
+            ></div>
+            <div
+              v-if="selectedElementInfo"
+              class="preview-panel__visual-edit-box preview-panel__visual-edit-box--selected"
+              :style="getVisualEditBoxStyle(selectedElementInfo)"
+            ></div>
+          </div>
+          <div v-if="!previewReady || !previewUrl" class="preview-placeholder">
             <p v-if="sending">代码生成中，完成后自动展示预览...</p>
             <p v-else>发送消息后，生成完成会在这里展示网站效果。</p>
           </div>
@@ -970,7 +1180,9 @@ onBeforeUnmount(() => {
           </div>
           <p class="app-detail__time">创建时间：{{ appInfo?.createTime || '-' }}</p>
           <p class="app-detail__meta">
-            生成类型：<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
+            生成类型：<strong class="app-chat-view__code-type">{{
+              appInfo?.codeGenType || '-'
+            }}</strong>
           </p>
         </div>
 
@@ -1225,6 +1437,10 @@ onBeforeUnmount(() => {
   padding: 14px;
 }
 
+.chat-panel__selected-element {
+  margin-bottom: 12px;
+}
+
 .chat-panel__editor-footer {
   margin-top: 10px;
   display: flex;
@@ -1260,15 +1476,59 @@ onBeforeUnmount(() => {
   color: #0f172a;
 }
 
+.preview-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .preview-panel__body {
   flex: 1;
   min-height: 0;
+  position: relative;
+  overflow: hidden;
 }
 
 .preview-panel__body iframe {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+.preview-panel__body--visual-editing iframe {
+  cursor: crosshair;
+  pointer-events: none;
+}
+
+.preview-panel__visual-edit-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: crosshair;
+  background: rgba(22, 119, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.35);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.preview-panel__visual-edit-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.preview-panel__visual-edit-box--hover {
+  border: 2px dashed rgba(22, 119, 255, 0.88);
+  background: rgba(22, 119, 255, 0.08);
+}
+
+.preview-panel__visual-edit-box--selected {
+  border: 3px solid rgba(9, 88, 217, 0.98);
+  background: rgba(9, 88, 217, 0.1);
 }
 
 .preview-placeholder {
