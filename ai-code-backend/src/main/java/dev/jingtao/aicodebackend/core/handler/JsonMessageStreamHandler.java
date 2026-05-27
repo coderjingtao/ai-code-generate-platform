@@ -1,10 +1,11 @@
 package dev.jingtao.aicodebackend.core.handler;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import dev.jingtao.aicodebackend.ai.model.message.*;
+import dev.jingtao.aicodebackend.ai.tools.BaseTool;
+import dev.jingtao.aicodebackend.ai.tools.ToolManager;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
 import dev.jingtao.aicodebackend.model.entity.Users;
@@ -25,6 +26,8 @@ public class JsonMessageStreamHandler {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+    @Resource
+    private ToolManager toolManager;
     /**
      * 处理 TokenStream（VUE_PROJECT）
      * 解析 JSON 消息并重组为完整的响应格式
@@ -99,9 +102,12 @@ public class JsonMessageStreamHandler {
                 String toolName = toolCallMessage.getName();
                 //检查是否为第一次看到这个工具ID
                 if (toolId != null && !seenToolIds.contains(toolId)) {
-                    //第一次调用该工具，记录这个工具ID
+                    // 第一次调用该工具，记录这个工具ID
                     seenToolIds.add(toolId);
-                    return "\n [⚙️选择工具: " + toolName + " 写入文件]\n";
+                    // 根据工具名称获取工具实例
+                    BaseTool tool = toolManager.getTool(toolName);
+                    // 返回格式化的工具调用信息
+                    return tool.generateToolRequestResponse();
                 } else{
                     // 不是第一次调用该工具
                     return StrUtil.EMPTY;
@@ -110,20 +116,10 @@ public class JsonMessageStreamHandler {
             case TOOL_EXECUTED -> {
                 ToolExecutedMessage toolExecutedMessage = JSONUtil.toBean(chunk, ToolExecutedMessage.class);
                 JSONObject jsonObject = JSONUtil.parseObj(toolExecutedMessage.getArguments());
-                String relativeFilePath = jsonObject.getStr("fileRelativePath");
-                if (StrUtil.isBlank(relativeFilePath)) {
-                    relativeFilePath = jsonObject.getStr("relativeFilePath");
-                }
-                String suffix = FileUtil.getSuffix(relativeFilePath);
-                String content = jsonObject.getStr("content");
-                String result = String.format(
-                        """
-                                [工具调用] 写入文件 %s 
-                                ```%s
-                                %s
-                                ```
-                                """, relativeFilePath, suffix, content
-                );
+                // 根据工具名称获取工具实例
+                String toolName = toolExecutedMessage.getName();
+                BaseTool tool = toolManager.getTool(toolName);
+                String result = tool.generateToolExecutedResult(jsonObject);
                 //输出前端和要持久化的内容
                 String output = String.format("\n%s\n", result);
                 aiMessageBuilder.append(output);

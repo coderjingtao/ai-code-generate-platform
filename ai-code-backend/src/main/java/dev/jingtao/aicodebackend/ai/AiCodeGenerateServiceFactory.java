@@ -2,7 +2,7 @@ package dev.jingtao.aicodebackend.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import dev.jingtao.aicodebackend.ai.tools.FileWriteTool;
+import dev.jingtao.aicodebackend.ai.tools.ToolManager;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
@@ -37,7 +37,7 @@ public class AiCodeGenerateServiceFactory {
     private ChatHistoryService chatHistoryService;
 
     @Resource
-    private FileWriteTool fileWriteTool;
+    private ToolManager toolManager;
 
     /**
      *  存放【AI服务】实例的内存缓存
@@ -93,24 +93,12 @@ public class AiCodeGenerateServiceFactory {
                     AiServices.builder(AiCodeGenerateService.class)
                             .streamingChatModel(reasoningStreamingChatModel)
                             .chatMemoryProvider(memoryId -> chatMemory)
-                            .tools(fileWriteTool)
+                            .tools(toolManager.getAllTools())
                             .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(toolExecutionRequest, "Error: No such tool called " + toolExecutionRequest.name()))
                             .build();
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenType);
         };
     }
-
-//    @Bean
-//    public AiCodeGenerateService aiCodeGenerateService(){
-//        // For Chat Model only
-////        return AiServices.create(AiCodeGenerateService.class, chatModel);
-//
-//        // For Chat Model and Streaming Chat Model
-//        return AiServices.builder(AiCodeGenerateService.class)
-//                .chatModel(chatModel)
-//                .streamingChatModel(openAiStreamingChatModel)
-//                .build();
-//    }
 
     private String buildCacheKey(Long appId, CodeGenTypeEnum codeGenType){
         return appId + "_" + codeGenType.getValue();
