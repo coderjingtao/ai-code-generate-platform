@@ -1,4 +1,4 @@
-package dev.jingtao.aicodebackend.ai;
+package dev.jingtao.aicodebackend.langgraph4j.ai;
 
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
@@ -7,16 +7,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration
+/**
+ * 代码质量检查服务工厂
+ */
 @Slf4j
-public class AiCodeGenTypeRoutingServiceFactory {
+@Configuration
+public class CodeQualityCheckServiceFactory {
 
     @Resource(name = "stableOpenAiChatModel")
     private ChatModel chatModel;
 
     @Bean
-    public AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService(){
-        return AiServices.builder(AiCodeGenTypeRoutingService.class)
+    public CodeQualityCheckService createCodeQualityCheckService(){
+        return AiServices.builder(CodeQualityCheckService.class)
                 .chatModel(chatModel)
                 .build();
     }

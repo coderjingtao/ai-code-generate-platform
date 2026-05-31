@@ -1,0 +1,55 @@
+package dev.jingtao.aicodebackend.langgraph4j.node;
+
+import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
+import dev.jingtao.aicodebackend.exception.BusinessException;
+import dev.jingtao.aicodebackend.exception.ErrorCode;
+import dev.jingtao.aicodebackend.langgraph4j.state.WorkflowContext;
+import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
+import dev.jingtao.aicodebackend.utils.SpringContextUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.bsc.langgraph4j.action.AsyncNodeAction;
+import org.bsc.langgraph4j.prebuilt.MessagesState;
+
+import java.io.File;
+
+import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
+
+@Slf4j
+public class ProjectBuilderNode {
+
+    public static AsyncNodeAction<MessagesState<String>> create() {
+        return node_async(state -> {
+            WorkflowContext context = WorkflowContext.getContext(state);
+            log.info("开始执行节点: 项目构建");
+
+            // 获取必要的参数
+            String generatedCodeDir = context.getGeneratedCodeDir();
+            CodeGenTypeEnum generationType = context.getGenerationType();
+
+            // Vue 项目类型：使用 VueProjectBuilder 进行构建
+            String buildResultDir;
+            try{
+                var vueProjectBuilder = SpringContextUtil.getBean(VueProjectBuilder.class);
+                // 执行 Vue 项目构建（npm install + npm run build）
+                boolean success = vueProjectBuilder.buildProject(generatedCodeDir);
+                if(success){
+                    // 构建成功，返回 dist 目录路径
+                    buildResultDir = generatedCodeDir + File.separator + "dist";
+                    log.info("Vue 项目构建成功，dist 目录: {}", buildResultDir);
+                } else {
+                    throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Vue 项目构建失败");
+                }
+            }catch (Exception e){
+                log.error("Vue 项目构建异常: {}", e.getMessage(), e);
+                buildResultDir = generatedCodeDir; // 异常时返回原路径
+            }
+
+            // 更新状态
+            context.setCurrentStep("项目构建");
+            context.setBuildResultDir(buildResultDir);
+            log.info("项目构建完成，结果目录: {}", buildResultDir);
+            return WorkflowContext.saveContext(context);
+        });
+    }
+}
+

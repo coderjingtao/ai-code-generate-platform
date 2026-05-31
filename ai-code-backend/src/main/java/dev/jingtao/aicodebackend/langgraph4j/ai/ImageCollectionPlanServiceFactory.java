@@ -1,22 +1,20 @@
-package dev.jingtao.aicodebackend.ai;
+package dev.jingtao.aicodebackend.langgraph4j.ai;
 
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@Slf4j
-public class AiCodeGenTypeRoutingServiceFactory {
+public class ImageCollectionPlanServiceFactory {
 
     @Resource(name = "stableOpenAiChatModel")
     private ChatModel chatModel;
 
     @Bean
-    public AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService(){
-        return AiServices.builder(AiCodeGenTypeRoutingService.class)
+    public ImageCollectionPlanService createImageCollectionPlanService(){
+        return AiServices.builder(ImageCollectionPlanService.class)
                 .chatModel(chatModel)
                 .build();
     }

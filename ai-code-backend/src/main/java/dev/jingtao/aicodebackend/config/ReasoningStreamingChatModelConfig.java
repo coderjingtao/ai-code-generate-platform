@@ -63,7 +63,7 @@ public class ReasoningStreamingChatModelConfig {
      */
     private String reasoningEffort;
 
-    @Bean
+    @Bean("reasoningStreamingChatModel")
     public StreamingChatModel reasoningStreamingChatModel(){
         OpenAiStreamingChatModel.OpenAiStreamingChatModelBuilder builder = OpenAiStreamingChatModel.builder()
                 .baseUrl(baseUrl)

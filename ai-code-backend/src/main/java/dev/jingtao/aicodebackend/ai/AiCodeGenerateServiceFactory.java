@@ -21,7 +21,7 @@ import java.time.Duration;
 @Slf4j
 public class AiCodeGenerateServiceFactory {
 
-    @Resource
+    @Resource(name = "openAiChatModel")
     private ChatModel chatModel;
 
     @Resource
