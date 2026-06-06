@@ -23,7 +23,9 @@ import static org.bsc.langgraph4j.GraphDefinition.START;
 import static org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async;
 
 /**
- * 并发执行的代码生成工作流
+ * 并发执行的代码生成工作流：
+ * 该工作流使用【图片规划节点】作为父节点，来让每个【图片搜集子节点】平行的执行图片搜集工作，
+ * 搜集成功后，每个【图片搜集子节点】把搜集结果汇总到【图片聚合节点】上
  */
 @Slf4j
 public class CodeGenConcurrentWorkflow {

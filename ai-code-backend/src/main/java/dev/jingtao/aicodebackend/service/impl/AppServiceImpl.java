@@ -11,6 +11,7 @@ import dev.jingtao.aicodebackend.ai.AiCodeGenTypeRoutingService;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
 import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
+import dev.jingtao.aicodebackend.core.engine.CodeGenEngine;
 import dev.jingtao.aicodebackend.core.handler.StreamHandlerExecutor;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
@@ -23,6 +24,7 @@ import dev.jingtao.aicodebackend.model.dto.app.AppUpdateRequest;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.enums.ChatHistoryMessageTypeEnum;
+import dev.jingtao.aicodebackend.model.enums.CodeGenModeEnum;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
 import dev.jingtao.aicodebackend.model.vo.AppVO;
 import dev.jingtao.aicodebackend.model.vo.UserVO;
@@ -30,7 +32,8 @@ import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
 import dev.jingtao.aicodebackend.service.ScreenshotService;
 import dev.jingtao.aicodebackend.service.UsersService;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -39,10 +42,7 @@ import reactor.core.publisher.Flux;
 import java.io.File;
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -52,19 +52,44 @@ import java.util.stream.Collectors;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
-    private final UsersService usersService;
-    private final AiCodeGeneratorFacade aiCodeGeneratorFacade;
-    private final ChatHistoryService chatHistoryService;
-    private final StreamHandlerExecutor streamHandlerExecutor;
-    private final VueProjectBuilder vueProjectBuilder;
-    private final ScreenshotService screenshotService;
-    private final AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    @Resource
+    private UsersService usersService;
+    @Resource
+    private AiCodeGeneratorFacade aiCodeGeneratorFacade;
+    @Resource
+    private ChatHistoryService chatHistoryService;
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
+    @Resource
+    private ScreenshotService screenshotService;
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    @Resource
+    private List<CodeGenEngine> codeGenEngineList;
+
+    private final Map<CodeGenModeEnum, CodeGenEngine> codeGenEngineMap = new EnumMap<>(CodeGenModeEnum.class);
+
+    @PostConstruct
+    public void init(){
+        if(codeGenEngineMap.isEmpty()){
+            for(CodeGenEngine engine : codeGenEngineList){
+                codeGenEngineMap.put(engine.mode(), engine);
+            }
+        }
+    }
+
+    private CodeGenEngine getCodeGenEngine(CodeGenModeEnum mode){
+        CodeGenEngine selectedEngine = codeGenEngineMap.getOrDefault(mode, codeGenEngineMap.get(CodeGenModeEnum.CLASSIC));
+        ThrowUtils.throwIf(selectedEngine == null, ErrorCode.SYSTEM_ERROR, "未找到可用的代码生成引擎："+ mode.name());
+        return selectedEngine;
+    }
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser) {
+    public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode) {
         // 1.参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
@@ -76,11 +101,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 4.获取代码的生成类型
         String codeGenType = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
-        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "代码的生成类型错误");
+        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的代码生成类型："+ codeGenType);
+
+        CodeGenModeEnum codeGenMode = CodeGenModeEnum.getEnumByValue(mode);
+        CodeGenEngine codeGenEngine = getCodeGenEngine(codeGenMode);
         // 5.添加[用户消息]到对话历史
         chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
-        // 6.调用 AI 生成代码（流式）
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId);
+        // 6.根据选择的代码引擎来生成代码
+        Flux<String> codeStream = codeGenEngine.generate(appId, userPrompt, loginUser, codeGenTypeEnum);
         // 7.收集AI响应内容并在完成后添加到对话历史中
         return streamHandlerExecutor.doExecute(codeStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
     }

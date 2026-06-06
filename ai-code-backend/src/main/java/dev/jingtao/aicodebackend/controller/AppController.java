@@ -53,6 +53,8 @@ public class AppController {
     @Resource
     private ProjectDownloadService projectDownloadService;
 
+
+
     /**
      * 用户提示词生成应用，并流式返回给前端
      * @param appId 应用ID
@@ -63,12 +65,13 @@ public class AppController {
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                       @RequestParam String userPrompt,
+                                      @RequestParam(defaultValue = "classic") String mode,
                                       HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "Invalid app id");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt), ErrorCode.PARAMS_ERROR, "User prompt must not be empty");
         Users loginUser = usersService.getLoginUser(request);
         // 调用AI服务生成流式代码
-        Flux<String> codeStream = appService.chatToGenCode(appId, userPrompt, loginUser);
+        Flux<String> codeStream = appService.chatToGenCode(appId, userPrompt, loginUser, mode);
         // 把流式代码封装成 ServerSentEvent 格式，解决前端空格丢失的问题
         return codeStream
                 .map(code -> {
