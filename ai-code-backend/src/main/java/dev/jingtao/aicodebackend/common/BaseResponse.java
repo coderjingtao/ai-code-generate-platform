@@ -2,10 +2,12 @@ package dev.jingtao.aicodebackend.common;
 
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
 @Data
+@NoArgsConstructor
 public class BaseResponse<T> implements Serializable {
 
     private int code;
@@ -28,4 +30,3 @@ public class BaseResponse<T> implements Serializable {
         this(errorCode.getCode(), null, errorCode.getMessage());
     }
 }
-

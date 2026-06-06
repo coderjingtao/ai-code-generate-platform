@@ -6,8 +6,6 @@ import cn.hutool.json.JSONUtil;
 import dev.jingtao.aicodebackend.ai.model.message.*;
 import dev.jingtao.aicodebackend.ai.tools.BaseTool;
 import dev.jingtao.aicodebackend.ai.tools.ToolManager;
-import dev.jingtao.aicodebackend.constant.AppConstant;
-import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.enums.ChatHistoryMessageTypeEnum;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
@@ -16,16 +14,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
-import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * JSON 消息流处理器
+ * 它处理的是已经被AiCodeGeneratorFacade包装并转成内部JSON Message的文本流
+ * 最终要给前端展示，并写入聊天历史记录
+ * 它面对的是这样的字符串：
+ * {"type":"ai_response","data":"xxx"}
+ * {"type":"tool_executed","name":"xxx","arguments":"..."}
+ * {"type":"thinking","data":"..."}
+ */
 @Slf4j
 @Component
 public class JsonMessageStreamHandler {
 
-    @Resource
-    private VueProjectBuilder vueProjectBuilder;
     @Resource
     private ToolManager toolManager;
     /**
@@ -58,9 +62,6 @@ public class JsonMessageStreamHandler {
                     if(StrUtil.isNotBlank(aiMessage)) {
                         chatHistoryService.addChatHistory(appId, aiMessage, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     }
-                    // 异步构建 Vue 项目
-                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectPath);
                 })
                 .doOnError(error -> {
                     // 如果 AI 回复失败，也要记录错误信息
@@ -93,13 +94,29 @@ public class JsonMessageStreamHandler {
             case AI_RESPONSE -> {
                 AiResponseMessage aiResponseMessage = JSONUtil.toBean(chunk, AiResponseMessage.class);
                 String data = aiResponseMessage.getData();
+                if(StrUtil.isBlank(data)){
+                    return StrUtil.EMPTY;
+                }
                 aiMessageBuilder.append(data);
                 return data;
             }
-            case TOOL_CALL -> {
-                ToolCallMessage toolCallMessage = JSONUtil.toBean(chunk, ToolCallMessage.class);
-                String toolId = toolCallMessage.getId();
-                String toolName = toolCallMessage.getName();
+            case THINKING -> {
+                ThinkingMessage thinkingMessage = JSONUtil.toBean(chunk, ThinkingMessage.class);
+                String data = thinkingMessage.getData();
+                if(StrUtil.isBlank(data)){
+                    return StrUtil.EMPTY;
+                }
+                aiMessageBuilder.append(data);
+                // Thinking 仍实时返回前端，用于流式展示
+                return JSONUtil.createObj()
+                        .set("type", StreamMessageTypeEnum.THINKING.getValue())
+                        .set("data", data)
+                        .toString();
+            }
+            case TOOL_REQUEST -> {
+                ToolRequestMessage toolRequestMessage = JSONUtil.toBean(chunk, ToolRequestMessage.class);
+                String toolId = toolRequestMessage.getId();
+                String toolName = toolRequestMessage.getName();
                 //检查是否为第一次看到这个工具ID
                 if (toolId != null && !seenToolIds.contains(toolId)) {
                     // 第一次调用该工具，记录这个工具ID
@@ -124,9 +141,6 @@ public class JsonMessageStreamHandler {
                 String output = String.format("\n%s\n", result);
                 aiMessageBuilder.append(output);
                 return output;
-            }
-            case PARTIAL_THINKING -> {
-                return StrUtil.EMPTY;
             }
             default -> {
                 log.error("Unknown message type: {}", messageType);

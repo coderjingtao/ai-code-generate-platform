@@ -1,13 +1,16 @@
 package dev.jingtao.aicodebackend.core;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import dev.jingtao.aicodebackend.ai.AiCodeGenerateServiceFactory;
 import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
 import dev.jingtao.aicodebackend.ai.model.message.AiResponseMessage;
-import dev.jingtao.aicodebackend.ai.model.message.PartialThinkingMessage;
-import dev.jingtao.aicodebackend.ai.model.message.ToolCallMessage;
+import dev.jingtao.aicodebackend.ai.model.message.ThinkingMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ToolExecutedMessage;
+import dev.jingtao.aicodebackend.ai.model.message.ToolRequestMessage;
+import dev.jingtao.aicodebackend.constant.AppConstant;
+import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
 import dev.jingtao.aicodebackend.core.parser.CodeParserExecutor;
 import dev.jingtao.aicodebackend.core.saver.CodeFileSaverExecutor;
 import dev.jingtao.aicodebackend.exception.BusinessException;
@@ -21,13 +24,20 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 直接面对的是AI底层大模型LLM层面的处理
+ */
 @Service
 @Slf4j
 public class AiCodeGeneratorFacade {
 
     @Resource
     private AiCodeGenerateServiceFactory aiCodeGenerateServiceFactory;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 统一入口：根据代码生成的类型，生成代码并保存到文件
@@ -102,38 +112,70 @@ public class AiCodeGeneratorFacade {
 
     /**
      * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息
+     * 它是面向AI底层模型/工具执行层面的回调，处理的是 TokenStream 回调状态
+     * [核心职责]：
+     * 把 LangChain4j 的 TokenStream 事件，根据回调状态包装成项目内部统一的 JSON 消息流
      *
-     * @param tokenStream TokenStream 对象
+     * @param tokenStream LangChain4j 的 TokenStream 对象
      * @param appId       应用 ID
-     * @return Flux<String> 流式响应
+     * @return 系统内部的JSON Message流
      */
     private Flux<String> processTokenStream(TokenStream tokenStream, Long appId){
         return Flux.create(sink -> {
-            tokenStream
-            .onPartialResponse(partialResponse -> {
-                AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
-                sink.next(JSONUtil.toJsonStr(aiResponseMessage));
-            })
-            .onPartialToolCall(partialToolCall -> {
-                ToolCallMessage toolCallMessage = new ToolCallMessage(partialToolCall);
-                sink.next(JSONUtil.toJsonStr(toolCallMessage));
-            })
-            .onPartialThinking(partialThinking -> {
-                PartialThinkingMessage partialThinkingMessage = new PartialThinkingMessage(partialThinking);
-                sink.next(JSONUtil.toJsonStr(partialThinkingMessage));
-            })
-            .onToolExecuted(toolExecution -> {
-                ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
-                sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
-            })
-            .onCompleteResponse(response -> {
-                sink.complete();
-            })
-            .onError(error -> {
-                log.error("AI response error: {}", error.getMessage(), error);
-                sink.error(error);
-            })
-            .start();
+            AtomicInteger emittedChunkCount = new AtomicInteger(0);
+
+            TokenStream configuredStream = tokenStream
+                    // AI普通文本分片
+                    .onPartialResponse(partialResponse -> {
+                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                        emittedChunkCount.incrementAndGet();
+                    })
+                    // 工具即将执行
+                    .beforeToolExecution(beforeToolExecution -> {
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(beforeToolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                        emittedChunkCount.incrementAndGet();
+                    })
+                    // 工具执行完成
+                    .onToolExecuted(toolExecution -> {
+                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                        emittedChunkCount.incrementAndGet();
+                    })
+                    // 模型完整响应结束
+                    .onCompleteResponse(response -> {
+                        // 兜底：某些模型实现可能只触发 onCompleteResponse，不触发 onPartialResponse 回调
+                        if (emittedChunkCount.get() == 0
+                                && response != null
+                                && response.aiMessage() != null
+                                && StrUtil.isNotBlank(response.aiMessage().text())) {
+                            sink.next(JSONUtil.toJsonStr(new AiResponseMessage(response.aiMessage().text())));
+                            emittedChunkCount.incrementAndGet();
+                        }
+                        log.info("TokenStream 完成，appId={}, emittedChunkCount={}", appId, emittedChunkCount.get());
+                        // 执行同步构建 Vue 项目，确保预览时项目已就绪
+                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
+                        vueProjectBuilder.buildProjectAsync(projectPath);
+                        sink.complete();
+                    })
+                    // 模型出现异常
+                    .onError(error -> {
+                        log.error("AI response error: {}", error.getMessage(), error);
+                        sink.error(error);
+                    });
+            // 仅当LLM支持深度思考时，才会收到思考分片
+            try {
+                // 思考内容分片
+                configuredStream = configuredStream.onPartialThinking(partialThinking -> {
+                    ThinkingMessage thinkingMessage = new ThinkingMessage(partialThinking);
+                    sink.next(JSONUtil.toJsonStr(thinkingMessage));
+                    emittedChunkCount.incrementAndGet();
+                });
+            } catch (UnsupportedOperationException e) {
+                log.debug("当前 TokenStream 实现不支持 onPartialThinking，已降级为普通流式输出");
+            }
+            configuredStream.start();
         });
     }
 }

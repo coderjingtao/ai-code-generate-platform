@@ -14,7 +14,8 @@ public enum StreamMessageTypeEnum {
     AI_RESPONSE("AI响应","ai_response"),
     TOOL_CALL("工具执行请求","tool_call"),
     TOOL_EXECUTED("工具执行结果","tool_executed"),
-    PARTIAL_THINKING("中间思考消息","partial_thinking")
+    THINKING("深度思考消息","thinking"),
+    TOOL_REQUEST("工具调用请求","tool_request"),
     ;
     private final String desc;
     private final String value;
