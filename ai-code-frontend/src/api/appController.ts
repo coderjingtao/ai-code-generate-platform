@@ -80,6 +80,8 @@ export async function chatToGenCode(
   return request<API.ServerSentEventString[]>('/app/chat/gen/code', {
     method: 'GET',
     params: {
+      // mode has a default value: classic
+      mode: 'classic',
       ...params,
     },
     ...(options || {}),

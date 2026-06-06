@@ -136,14 +136,32 @@ declare namespace API {
   type chatToGenCodeParams = {
     appId: number
     userPrompt: string
+    mode?: string
   }
 
   type DeleteRequest = {
     id?: number
   }
 
+  type DiagramTask = {
+    mermaidCode?: string
+    description?: string
+  }
+
   type downloadAppCodeParams = {
     appId: number
+  }
+
+  type executeWorkflowParams = {
+    userPrompt: string
+  }
+
+  type executeWorkflowWithFlexParams = {
+    userPrompt: string
+  }
+
+  type executeWorkflowWithSseParams = {
+    userPrompt: string
   }
 
   type getAppByIdForAdminParams = {
@@ -162,6 +180,27 @@ declare namespace API {
     id: number
   }
 
+  type IllustrationTask = {
+    query?: string
+  }
+
+  type ImageCollectionPlan = {
+    contentImageTasks?: ImageSearchTask[]
+    illustrationTasks?: IllustrationTask[]
+    diagramTasks?: DiagramTask[]
+    logoTasks?: LogoTask[]
+  }
+
+  type ImageResource = {
+    category?: 'CONTENT' | 'LOGO' | 'ILLUSTRATION' | 'ARCHITECTURE'
+    description?: string
+    url?: string
+  }
+
+  type ImageSearchTask = {
+    query?: string
+  }
+
   type listAppChatHistoryParams = {
     appId: number
     pageSize?: number
@@ -177,6 +216,10 @@ declare namespace API {
     userRole?: string
     createTime?: string
     updateTime?: string
+  }
+
+  type LogoTask = {
+    query?: string
   }
 
   type PageAppVO = {
@@ -206,10 +249,20 @@ declare namespace API {
     optimizeCountQuery?: boolean
   }
 
+  type QualityResult = {
+    isValid?: boolean
+    errors?: string[]
+    suggestions?: string[]
+  }
+
   type ServerSentEventString = true
 
   type serveStaticResourceParams = {
     deployKey: string
+  }
+
+  type SseEmitter = {
+    timeout?: number
   }
 
   type UserAddRequest = {
@@ -273,5 +326,26 @@ declare namespace API {
     userProfile?: string
     userRole?: string
     createTime?: string
+  }
+
+  type WorkflowContext = {
+    currentStep?: string
+    originalPrompt?: string
+    appId?: number
+    imageListStr?: string
+    imageList?: ImageResource[]
+    enhancedPrompt?: string
+    generationType?: 'HTML' | 'MULTI_FILE' | 'VUE_PROJECT'
+    generatedCodeDir?: string
+    buildResultDir?: string
+    qualityResult?: QualityResult
+    errorMessage?: string
+    imageCollectionPlan?: ImageCollectionPlan
+    contentImages?: ImageResource[]
+    illustrations?: ImageResource[]
+    diagrams?: ImageResource[]
+    logos?: ImageResource[]
+    streamSessionId?: string
+    streamConsumer?: Record<string, any>
   }
 }
