@@ -733,7 +733,7 @@ const sendPrompt = async (promptInput?: string) => {
   let hasStreamEvent = false
   let hasDoneEvent = false
 
-  const finalize = async (failed = false) => {
+  const finalize = async (failed = false, customError?: string) => {
     if (finished) {
       return
     }
@@ -743,7 +743,13 @@ const sendPrompt = async (promptInput?: string) => {
     const target = messages.value[assistantIndex]
     if (target) {
       target.streaming = false
-      target.content = target.content.trim() || (failed ? '生成失败，请稍后重试。' : '已完成。')
+      if (customError) {
+        target.content = target.content.trim()
+          ? `${target.content}\n\n[错误] ${customError}`
+          : customError
+      } else {
+        target.content = target.content.trim() || (failed ? '生成失败，请稍后重试。' : '已完成。')
+      }
     }
     await loadAppInfo()
     refreshPreview()
@@ -786,6 +792,22 @@ const sendPrompt = async (promptInput?: string) => {
     hasStreamEvent = true
     hasDoneEvent = true
     void finalize(false)
+  })
+
+  source.addEventListener('business-error', function (event: MessageEvent) {
+    if (finished) {
+      return
+    }
+    let errorMessage = '生成失败'
+    try {
+      const errorData = JSON.parse(event.data)
+      errorMessage = errorData.message || (event.data ? `生成失败：${event.data}` : '生成失败')
+    } catch (parseError) {
+      console.error('Failed to parse business error event data:', event.data, parseError)
+      errorMessage = event.data ? `生成失败：${event.data}` : '生成失败'
+    }
+    message.error(errorMessage)
+    void finalize(true, errorMessage)
   })
 
   source.onerror = () => {
