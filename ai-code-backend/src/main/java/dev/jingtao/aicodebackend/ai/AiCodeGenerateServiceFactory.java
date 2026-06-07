@@ -2,6 +2,8 @@ package dev.jingtao.aicodebackend.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import dev.jingtao.aicodebackend.ai.guardrail.PromptSafetyInputGuardrail;
+import dev.jingtao.aicodebackend.ai.guardrail.RetryOutputGuardrail;
 import dev.jingtao.aicodebackend.ai.tools.ToolManager;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
@@ -86,6 +88,8 @@ public class AiCodeGenerateServiceFactory {
                     AiServices.builder(AiCodeGenerateService.class)
                             .chatModel(chatModel)
                             .streamingChatModel(openAiStreamingChatModel)
+                            .inputGuardrails(new PromptSafetyInputGuardrail())
+                            .outputGuardrails(new RetryOutputGuardrail())
                             .chatMemory(chatMemory)
                             .build();
             // VUE_PROJECT 使用推理模型
@@ -94,6 +98,8 @@ public class AiCodeGenerateServiceFactory {
                             .streamingChatModel(reasoningStreamingChatModel)
                             .chatMemoryProvider(memoryId -> chatMemory)
                             .tools(toolManager.getAllTools())
+                            .inputGuardrails(new PromptSafetyInputGuardrail())
+                            .outputGuardrails(new RetryOutputGuardrail())
                             .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(toolExecutionRequest, "Error: No such tool called " + toolExecutionRequest.name()))
                             .build();
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenType);

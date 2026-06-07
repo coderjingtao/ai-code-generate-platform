@@ -3,6 +3,7 @@ package dev.jingtao.aicodebackend.exception;
 import cn.hutool.json.JSONUtil;
 import dev.jingtao.aicodebackend.common.BaseResponse;
 import dev.jingtao.aicodebackend.common.ResultUtils;
+import dev.langchain4j.guardrail.InputGuardrailException;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,6 +30,28 @@ public class GlobalExceptionHandler {
         }
         // 对于普通请求，返回标准 JSON 响应
         return ResultUtils.error(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(InputGuardrailException.class)
+    public BaseResponse<?> inputGuardrailExceptionHandler(InputGuardrailException e) {
+        log.error("InputGuardrailException", e);
+        // 提取干净的敏感词/攻击拦截提示语，去除 langchain4j 的类名包装前缀
+        String message = e.getMessage();
+        if (message != null) {
+            String marker = "failed with this message: ";
+            int index = message.indexOf(marker);
+            if (index != -1) {
+                message = message.substring(index + marker.length()).trim();
+            }
+        } else {
+            message = "输入内容不合规，请修改后重试";
+        }
+        // 尝试处理 SSE 请求
+        if (handleSseError(ErrorCode.PARAMS_ERROR.getCode(), message)) {
+            return null;
+        }
+        // 对于普通请求，返回标准 JSON 响应
+        return ResultUtils.error(ErrorCode.PARAMS_ERROR.getCode(), message);
     }
 
     @ExceptionHandler(RuntimeException.class)
