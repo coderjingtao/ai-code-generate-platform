@@ -1,15 +1,19 @@
 package dev.jingtao.aicodebackend.exception;
 
+import cn.hutool.json.JSONUtil;
 import dev.jingtao.aicodebackend.common.BaseResponse;
 import dev.jingtao.aicodebackend.common.ResultUtils;
-import dev.langchain4j.exception.HttpException;
-import dev.langchain4j.exception.RateLimitException;
 import io.swagger.v3.oas.annotations.Hidden;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.io.IOException;
+import java.util.Map;
 
 @Hidden
 @RestControllerAdvice
@@ -19,32 +23,79 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public BaseResponse<?> businessExceptionHandler(BusinessException e) {
         log.error("BusinessException", e);
-        return ResultUtils.error(e.getCode(), e.getMessage());
-    }
-
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-    @ExceptionHandler(RateLimitException.class)
-    public BaseResponse<AiRateLimitError> rateLimitExceptionHandler(RateLimitException e) {
-        AiRateLimitError error = AiRateLimitError.from(e);
-        log.warn("AI rate limit, retryAfterSeconds={}", error.getRetryAfterSeconds(), e);
-        return new BaseResponse<>(ErrorCode.AI_RATE_LIMIT_ERROR.getCode(), error, error.getMessage());
-    }
-
-    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
-    @ExceptionHandler(HttpException.class)
-    public BaseResponse<?> httpExceptionHandler(HttpException e) {
-        if (e.statusCode() == HttpStatus.SERVICE_UNAVAILABLE.value()) {
-            AiServiceUnavailableError error = AiServiceUnavailableError.create();
-            log.warn("AI service unavailable", e);
-            return new BaseResponse<>(ErrorCode.AI_SERVICE_UNAVAILABLE_ERROR.getCode(), error, error.getMessage());
+        // 尝试处理 SSE 请求
+        if(handleSseError(e.getCode(), e.getMessage())){
+            return null;
         }
-        log.error("AI http exception, statusCode={}", e.statusCode(), e);
-        return ResultUtils.error(ErrorCode.SYSTEM_ERROR, "AI 服务异常，请稍后再试");
+        // 对于普通请求，返回标准 JSON 响应
+        return ResultUtils.error(e.getCode(), e.getMessage());
     }
 
     @ExceptionHandler(RuntimeException.class)
     public BaseResponse<?> runtimeExceptionHandler(RuntimeException e) {
         log.error("RuntimeException", e);
+        // 尝试处理 SSE 请求
+        if(handleSseError(ErrorCode.SYSTEM_ERROR.getCode(), e.getMessage())){
+            return null;
+        }
+        // 对于普通请求，返回标准 JSON 响应
         return ResultUtils.error(ErrorCode.SYSTEM_ERROR, "系统错误");
+    }
+
+    /**
+     * 处理SSE请求的错误响应
+     *
+     * @param errorCode 错误码
+     * @param errorMessage 错误信息
+     * @return true表示是SSE请求并已处理，false表示不是SSE请求
+     */
+    private boolean handleSseError(int errorCode, String errorMessage) {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return false;
+        }
+        HttpServletRequest request = attributes.getRequest();
+        HttpServletResponse response = attributes.getResponse();
+        if (response == null) {
+            return false;
+        }
+        // 判断是否是SSE请求（通过Accept头或URL路径）
+        String accept = request.getHeader("Accept");
+        String uri = request.getRequestURI();
+        if ((accept != null && accept.contains("text/event-stream")) ||
+                uri.contains("/chat/gen/code")) {
+            try {
+                // SSE 响应已进入流式写入阶段时，避免再次写 response 导致 getOutputStream/getWriter 冲突
+                if (response.isCommitted()) {
+                    return true;
+                }
+                // 设置SSE响应头
+                response.setContentType("text/event-stream");
+                response.setCharacterEncoding("UTF-8");
+                response.setHeader("Cache-Control", "no-cache");
+                response.setHeader("Connection", "keep-alive");
+                // 构造错误消息的SSE格式
+                Map<String, Object> errorData = Map.of(
+                        "error", true,
+                        "code", errorCode,
+                        "message", errorMessage
+                );
+                String errorJson = JSONUtil.toJsonStr(errorData);
+                // 发送业务错误事件（避免与标准error事件冲突）
+                String sseData = "event: business-error\ndata: " + errorJson + "\n\n";
+                response.getWriter().write(sseData);
+                response.getWriter().flush();
+                // 发送结束事件
+                response.getWriter().write("event: done\ndata: {}\n\n");
+                response.getWriter().flush();
+                // 表示已处理SSE请求
+                return true;
+            } catch (IOException | IllegalStateException ioException) {
+                log.error("Failed to write SSE error response", ioException);
+                // 即使写入失败，也表示这是SSE请求
+                return true;
+            }
+        }
+        return false;
     }
 }

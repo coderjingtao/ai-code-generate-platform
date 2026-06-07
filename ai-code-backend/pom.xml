@@ -156,7 +156,12 @@
             <version>1.8.17</version> <!-- Or the current snapshot version -->
         </dependency>
 
-
+        <!-- Redisson -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>3.50.0</version>
+        </dependency>
 
     </dependencies>
 

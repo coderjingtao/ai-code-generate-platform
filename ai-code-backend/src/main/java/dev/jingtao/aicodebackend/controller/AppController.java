@@ -14,6 +14,8 @@ import dev.jingtao.aicodebackend.model.dto.app.*;
 import dev.jingtao.aicodebackend.model.entity.App;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.vo.AppVO;
+import dev.jingtao.aicodebackend.ratelimiter.annotation.RateLimit;
+import dev.jingtao.aicodebackend.ratelimiter.enums.RateLimitType;
 import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.ProjectDownloadService;
 import dev.jingtao.aicodebackend.service.UsersService;
@@ -63,6 +65,7 @@ public class AppController {
      * @param request 请求
      * @return SSE 流式字符串
      */
+    @RateLimit(limitType = RateLimitType.USER, rate = 2, rateInterval = 60, message = "Too many requests, please try again later.")
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                       @RequestParam String userPrompt,
