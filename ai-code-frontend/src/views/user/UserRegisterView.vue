@@ -9,12 +9,15 @@ const router = useRouter()
 const loading = ref(false)
 
 const formState = reactive<API.UserRegisterRequest>({
-  userAccount: '',
+  userEmail: '',
   userPassword: '',
   checkPassword: '',
 })
 
-const accountRules = [{ required: true, message: '请输入账号' }]
+const emailRules = [
+  { required: true, message: '请输入邮箱' },
+  { type: 'email', message: '请输入有效的邮箱地址' },
+]
 const passwordRules = [{ required: true, message: '请输入密码' }]
 const checkPasswordRules = [
   { required: true, message: '请再次输入密码' },
@@ -32,7 +35,7 @@ const handleFinish = async () => {
   loading.value = true
   try {
     const res = await userRegister({
-      userAccount: formState.userAccount,
+      userEmail: formState.userEmail,
       userPassword: formState.userPassword,
       checkPassword: formState.checkPassword,
     })
@@ -60,8 +63,8 @@ const handleFinish = async () => {
       </p>
 
       <a-form layout="vertical" :model="formState" autocomplete="off" @finish="handleFinish">
-        <a-form-item label="账号" name="userAccount" :rules="accountRules">
-          <a-input v-model:value="formState.userAccount" placeholder="请输入账号" size="large" />
+        <a-form-item label="邮箱" name="userEmail" :rules="emailRules">
+          <a-input v-model:value="formState.userEmail" placeholder="请输入邮箱" size="large" />
         </a-form-item>
 
         <a-form-item label="密码" name="userPassword" :rules="passwordRules">

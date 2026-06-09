@@ -7,7 +7,7 @@ import { addUser, deleteUser, listUserVoByPage, updateUser } from '@/api/usersCo
 
 interface UserDrawerForm {
   id?: number
-  userAccount: string
+  userEmail: string
   userName: string
   userAvatar: string
   userProfile: string
@@ -27,7 +27,7 @@ const searchParams = reactive<API.UserQueryRequest>({
   pageNum: 1,
   pageSize: 10,
   userName: '',
-  userAccount: '',
+  userEmail: '',
   userRole: undefined,
 })
 
@@ -38,7 +38,7 @@ const roleOptions = [
 
 const drawerForm = reactive<UserDrawerForm>({
   id: undefined,
-  userAccount: '',
+  userEmail: '',
   userName: '',
   userAvatar: '',
   userProfile: '',
@@ -64,8 +64,8 @@ const columns: TableColumnsType<API.UserVO> = [
     width: 180,
   },
   {
-    title: '账号',
-    dataIndex: 'userAccount',
+    title: '邮箱',
+    dataIndex: 'userEmail',
     width: 180,
   },
   {
@@ -91,7 +91,7 @@ const columns: TableColumnsType<API.UserVO> = [
 
 const resetDrawerForm = () => {
   drawerForm.id = undefined
-  drawerForm.userAccount = ''
+  drawerForm.userEmail = ''
   drawerForm.userName = ''
   drawerForm.userAvatar = ''
   drawerForm.userProfile = ''
@@ -104,7 +104,7 @@ const loadData = async () => {
     const res = await listUserVoByPage({
       ...searchParams,
       userName: searchParams.userName?.trim() || undefined,
-      userAccount: searchParams.userAccount?.trim() || undefined,
+      userEmail: searchParams.userEmail?.trim() || undefined,
       userRole: searchParams.userRole || undefined,
     })
 
@@ -131,7 +131,7 @@ const doReset = () => {
   searchParams.pageNum = 1
   searchParams.pageSize = 10
   searchParams.userName = ''
-  searchParams.userAccount = ''
+  searchParams.userEmail = ''
   searchParams.userRole = undefined
   void loadData()
 }
@@ -156,7 +156,7 @@ const openEditDrawer = (record: API.UserVO) => {
 
   drawerMode.value = 'edit'
   drawerForm.id = record.id
-  drawerForm.userAccount = record.userAccount || ''
+  drawerForm.userEmail = record.userEmail || ''
   drawerForm.userName = record.userName || ''
   drawerForm.userAvatar = record.userAvatar || ''
   drawerForm.userProfile = record.userProfile || ''
@@ -170,15 +170,15 @@ const closeDrawer = () => {
 
 const submitDrawer = async () => {
   const trimmedUserName = drawerForm.userName.trim()
-  const trimmedUserAccount = drawerForm.userAccount.trim()
+  const trimmedUserEmail = drawerForm.userEmail.trim()
 
   if (!trimmedUserName) {
     message.warning('请输入用户名')
     return
   }
 
-  if (drawerMode.value === 'create' && !trimmedUserAccount) {
-    message.warning('请输入账号')
+  if (drawerMode.value === 'create' && !trimmedUserEmail) {
+    message.warning('请输入邮箱')
     return
   }
 
@@ -191,7 +191,7 @@ const submitDrawer = async () => {
   try {
     if (drawerMode.value === 'create') {
       const res = await addUser({
-        userAccount: trimmedUserAccount,
+        userEmail: trimmedUserEmail,
         userName: trimmedUserName,
         userAvatar: drawerForm.userAvatar.trim() || undefined,
         userProfile: drawerForm.userProfile.trim() || undefined,
@@ -277,10 +277,10 @@ onMounted(() => {
           />
         </a-form-item>
 
-        <a-form-item label="账号" name="userAccount">
+        <a-form-item label="邮箱" name="userEmail">
           <a-input
-            v-model:value="searchParams.userAccount"
-            placeholder="请输入账号"
+            v-model:value="searchParams.userEmail"
+            placeholder="请输入邮箱"
             allow-clear
             style="width: 180px"
           />
@@ -368,10 +368,10 @@ onMounted(() => {
       @close="closeDrawer"
     >
       <a-form layout="vertical" :model="drawerForm">
-        <a-form-item label="账号" :required="drawerMode === 'create'">
+        <a-form-item label="邮箱" :required="drawerMode === 'create'">
           <a-input
-            v-model:value="drawerForm.userAccount"
-            placeholder="请输入账号"
+            v-model:value="drawerForm.userEmail"
+            placeholder="请输入邮箱"
             :disabled="drawerMode === 'edit'"
           />
         </a-form-item>

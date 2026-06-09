@@ -2,6 +2,7 @@ package dev.jingtao.aicodebackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -33,13 +34,13 @@ import static dev.jingtao.aicodebackend.constant.UserConstant.USER_LOGIN_STATE;
 public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implements UsersService{
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userEmail, String userPassword, String checkPassword) {
         // 1. 校验
-        if (StrUtil.hasBlank(userAccount, userPassword, checkPassword)) {
+        if (StrUtil.hasBlank(userEmail, userPassword, checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
-        if (userAccount.length() < 4) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短");
+        if (!Validator.isEmail(userEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式不正确");
         }
         if (userPassword.length() < 8 || checkPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
@@ -49,18 +50,18 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
         }
         // 2. 检查是否重复
         QueryWrapper queryWrapper = new QueryWrapper();
-        queryWrapper.eq("userAccount", userAccount);
+        queryWrapper.eq("userEmail", userEmail);
         long count = this.mapper.selectCountByQuery(queryWrapper);
         if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱重复");
         }
         // 3. 加密
         String encryptPassword = getEncryptPassword(userPassword);
         // 4. 插入数据
         Users user = new Users();
-        user.setUserAccount(userAccount);
+        user.setUserEmail(userEmail);
         user.setUserPassword(encryptPassword);
-        user.setUserName(userAccount);
+        user.setUserName(userEmail);
         user.setUserRole(UserRoleEnum.USER.getValue());
         boolean saveResult = this.save(user);
         if (!saveResult) {
@@ -87,13 +88,13 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
     }
 
     @Override
-    public LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request) {
+    public LoginUserVO userLogin(String userEmail, String userPassword, HttpServletRequest request) {
         // 1. 校验
-        if (StrUtil.hasBlank(userAccount, userPassword)) {
+        if (StrUtil.hasBlank(userEmail, userPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
-        if (userAccount.length() < 4) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号错误");
+        if (!Validator.isEmail(userEmail)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱格式不正确");
         }
         if (userPassword.length() < 8) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码错误");
@@ -102,7 +103,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
         String encryptPassword = getEncryptPassword(userPassword);
         // 查询用户是否存在
         QueryWrapper queryWrapper = new QueryWrapper();
-        queryWrapper.eq("userAccount", userAccount);
+        queryWrapper.eq("userEmail", userEmail);
         queryWrapper.eq("userPassword", encryptPassword);
         Users user = this.mapper.selectOneByQuery(queryWrapper);
         // 用户不存在
@@ -169,7 +170,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
         }
         Long id = userQueryRequest.getId();
-        String userAccount = userQueryRequest.getUserAccount();
+        String userEmail = userQueryRequest.getUserEmail();
         String userName = userQueryRequest.getUserName();
         String userProfile = userQueryRequest.getUserProfile();
         String userRole = userQueryRequest.getUserRole();
@@ -178,7 +179,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users>  implement
         return QueryWrapper.create()
                 .eq("id", id)
                 .eq("userRole", userRole)
-                .like("userAccount", userAccount)
+                .like("userEmail", userEmail)
                 .like("userName", userName)
                 .like("userProfile", userProfile)
                 .orderBy(sortField, "ascend".equals(sortOrder));

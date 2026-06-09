@@ -20,12 +20,12 @@ public interface UsersService extends IService<Users> {
     /**
      * 用户注册
      *
-     * @param userAccount   用户账户
+     * @param userEmail     用户邮箱
      * @param userPassword  用户密码
      * @param checkPassword 校验密码
      * @return 新用户 id
      */
-    long userRegister(String userAccount, String userPassword, String checkPassword);
+    long userRegister(String userEmail, String userPassword, String checkPassword);
 
     String getEncryptPassword(String userPassword);
 
@@ -39,12 +39,12 @@ public interface UsersService extends IService<Users> {
     /**
      * 用户登录
      *
-     * @param userAccount  用户账户
+     * @param userEmail    用户邮箱
      * @param userPassword 用户密码
      * @param request httpRequest
      * @return 脱敏后的用户信息
      */
-    LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request);
+    LoginUserVO userLogin(String userEmail, String userPassword, HttpServletRequest request);
 
     /**
      * 获取当前登录用户

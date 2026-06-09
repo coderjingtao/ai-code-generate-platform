@@ -36,19 +36,19 @@ public class UsersController {
     @PostMapping("register")
     public BaseResponse<Long> register(@RequestBody UserRegisterRequest request) {
         ThrowUtils.throwIf(request == null, ErrorCode.PARAMS_ERROR);
-        String userAccount = request.getUserAccount();
+        String userEmail = request.getUserEmail();
         String userPassword = request.getUserPassword();
         String checkPassword = request.getCheckPassword();
-        long userId = usersService.userRegister(userAccount, userPassword, checkPassword);
+        long userId = usersService.userRegister(userEmail, userPassword, checkPassword);
         return ResultUtils.success(userId);
     }
 
     @PostMapping("/login")
     public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(userLoginRequest == null, ErrorCode.PARAMS_ERROR);
-        String userAccount = userLoginRequest.getUserAccount();
+        String userEmail = userLoginRequest.getUserEmail();
         String userPassword = userLoginRequest.getUserPassword();
-        LoginUserVO loginUserVO = usersService.userLogin(userAccount, userPassword, request);
+        LoginUserVO loginUserVO = usersService.userLogin(userEmail, userPassword, request);
         return ResultUtils.success(loginUserVO);
     }
 

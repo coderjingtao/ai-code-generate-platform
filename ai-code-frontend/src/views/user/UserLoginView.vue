@@ -11,7 +11,7 @@ const loginUserStore = useLoginUserStore()
 const loading = ref(false)
 
 const formState = reactive<API.UserLoginRequest>({
-  userAccount: '',
+  userEmail: '',
   userPassword: '',
 })
 
@@ -19,7 +19,7 @@ const handleFinish = async () => {
   loading.value = true
   try {
     const res = await userLogin({
-      userAccount: formState.userAccount,
+      userEmail: formState.userEmail,
       userPassword: formState.userPassword,
     })
     if (res.data.code === 0 && res.data.data) {
@@ -28,7 +28,7 @@ const handleFinish = async () => {
       await router.replace('/')
       return
     }
-    message.error(res.data.message || '登录失败，请检查账号或密码')
+    message.error(res.data.message || '登录失败，请检查邮箱或密码')
   } catch {
     message.error('登录失败，请稍后重试')
   } finally {
@@ -48,11 +48,14 @@ const handleFinish = async () => {
 
       <a-form layout="vertical" :model="formState" autocomplete="off" @finish="handleFinish">
         <a-form-item
-          label="账号"
-          name="userAccount"
-          :rules="[{ required: true, message: '请输入账号' }]"
+          label="邮箱"
+          name="userEmail"
+          :rules="[
+            { required: true, message: '请输入邮箱' },
+            { type: 'email', message: '请输入有效的邮箱地址' }
+          ]"
         >
-          <a-input v-model:value="formState.userAccount" placeholder="请输入账号" size="large" />
+          <a-input v-model:value="formState.userEmail" placeholder="请输入邮箱" size="large" />
         </a-form-item>
 
         <a-form-item

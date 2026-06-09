@@ -36,10 +36,10 @@ public class Users implements Serializable {
     private Long id;
 
     /**
-     * 账号
+     * 邮箱
      */
-    @Column("userAccount")
-    private String userAccount;
+    @Column("userEmail")
+    private String userEmail;
 
     /**
      * 密码
