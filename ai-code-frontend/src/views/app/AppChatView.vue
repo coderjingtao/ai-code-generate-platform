@@ -491,6 +491,16 @@ const extractTextFromPayload = (payload: unknown): string => {
   }
 
   if (typeof payload === 'string') {
+    if (payload.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(payload)
+        if (parsed && typeof parsed === 'object' && parsed.type === 'thinking' && typeof parsed.data === 'string') {
+          return parsed.data
+        }
+      } catch {
+        // ignore
+      }
+    }
     return payload
   }
 
@@ -504,7 +514,18 @@ const extractTextFromPayload = (payload: unknown): string => {
     // 兼容后端包装格式：{"d":"..."}
     for (const key of ['d', 'content', 'delta', 'text', 'answer', 'message']) {
       if (typeof record[key] === 'string') {
-        return record[key] as string
+        const val = record[key] as string
+        if (val.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(val)
+            if (parsed && typeof parsed === 'object' && parsed.type === 'thinking' && typeof parsed.data === 'string') {
+              return parsed.data
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return val
       }
     }
 

@@ -156,7 +156,7 @@ public class AiCodeGeneratorFacade {
                         log.info("TokenStream 完成，appId={}, emittedChunkCount={}", appId, emittedChunkCount.get());
                         // 执行同步构建 Vue 项目，确保预览时项目已就绪
                         String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
-                        vueProjectBuilder.buildProjectAsync(projectPath);
+                        vueProjectBuilder.buildProject(projectPath);
                         sink.complete();
                     })
                     // 模型出现异常
