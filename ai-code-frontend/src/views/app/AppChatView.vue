@@ -13,6 +13,7 @@ import {
   downloadAppCode,
   getAppByIdForAdmin,
   getMyAppById,
+  listAppFiles,
 } from '@/api/appController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
@@ -77,6 +78,185 @@ const selectedElementInfo = ref<VisualEditElementInfo | null>(null)
 const visualIframeEditorRef = ref<VisualIframeEditor | null>(null)
 const CHAT_STREAM_PATH = '/app/chat/gen/code'
 let previewSrcDocLoadToken = 0
+
+// --- Workspace Tab & Code Viewer State ---
+const activeTab = ref<'preview' | 'code'>('preview')
+const files = ref<string[]>([])
+const selectedKeys = ref<string[]>([])
+const selectedFileContent = ref<string>('')
+const loadingFiles = ref(false)
+const loadingContent = ref(false)
+
+const lineCount = computed(() => {
+  if (!selectedFileContent.value) return 0
+  return selectedFileContent.value.split('\n').length
+})
+
+const highlightedCode = computed(() => {
+  if (!selectedFileContent.value) return ''
+  return applyCodeHighlight(selectedFileContent.value)
+})
+
+interface AntdTreeNode {
+  title: string
+  key: string
+  isLeaf?: boolean
+  children?: AntdTreeNode[]
+}
+
+const buildFileTree = (fileList: string[]): AntdTreeNode[] => {
+  const root: AntdTreeNode[] = []
+
+  fileList.forEach((file) => {
+    const parts = file.split('/')
+    let currentLevel = root
+
+    parts.forEach((part, index) => {
+      const isLeaf = index === parts.length - 1
+      const key = parts.slice(0, index + 1).join('/')
+
+      let existing = currentLevel.find((item) => item.title === part)
+      if (!existing) {
+        existing = {
+          title: part,
+          key: key,
+          isLeaf: isLeaf,
+        }
+        if (!isLeaf) {
+          existing.children = []
+        }
+        currentLevel.push(existing)
+      }
+      if (!isLeaf && existing.children) {
+        currentLevel = existing.children
+      }
+    })
+  })
+
+  const sortTree = (nodes: AntdTreeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.isLeaf !== b.isLeaf) {
+        return a.isLeaf ? 1 : -1
+      }
+      return a.title.localeCompare(b.title)
+    })
+    nodes.forEach((node) => {
+      if (node.children) {
+        sortTree(node.children)
+      }
+    })
+  }
+
+  sortTree(root)
+  return root
+}
+
+const fileTreeData = computed(() => buildFileTree(files.value))
+
+const fetchFileContent = async (filePath: string) => {
+  if (!appId.value || !appInfo.value?.codeGenType) return
+  loadingContent.value = true
+  try {
+    const codeGenType = appInfo.value.codeGenType
+    const url = `/api/static/${codeGenType}_${appId.value}/${filePath}`
+    const res = await fetch(`${url}?t=${Date.now()}`)
+    if (res.ok) {
+      selectedFileContent.value = await res.text()
+    } else {
+      selectedFileContent.value = `加载文件失败: ${res.statusText}`
+    }
+  } catch (err: any) {
+    selectedFileContent.value = `加载文件失败: ${err.message || err}`
+  } finally {
+    loadingContent.value = false
+  }
+}
+
+const loadProjectFiles = async () => {
+  if (!appId.value) return
+  loadingFiles.value = true
+  try {
+    const res = await listAppFiles({ appId: appId.value })
+    if (res.data?.code === 0 && res.data?.data) {
+      files.value = res.data.data
+      if (files.value.length > 0) {
+        const currentFile = selectedKeys.value[0]
+        if (!currentFile || !files.value.includes(currentFile)) {
+          const defaultFile = files.value.find(f => f.endsWith('index.html')) || files.value[0]
+          selectedKeys.value = [defaultFile]
+          void fetchFileContent(defaultFile)
+        } else {
+          void fetchFileContent(currentFile)
+        }
+      } else {
+        selectedKeys.value = []
+        selectedFileContent.value = ''
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load project files:', err)
+  } finally {
+    loadingFiles.value = false
+  }
+}
+
+const onFileSelect = (keys: any[], info: any) => {
+  if (info.node.isLeaf && keys.length > 0) {
+    void fetchFileContent(keys[0])
+  } else {
+    if (selectedKeys.value.length === 0 && keys.length === 0) {
+      selectedKeys.value = info.node.isLeaf ? [info.node.key] : selectedKeys.value
+    }
+  }
+}
+
+const guessFilePath = (language?: string): string => {
+  if (!language) return ''
+  if (language.includes('.') || language.includes('/')) {
+    return language
+  }
+  const ext = language.toLowerCase()
+  if (ext === 'html') return files.value.find(f => f.endsWith('.html')) || ''
+  if (ext === 'css') return files.value.find(f => f.endsWith('.css')) || ''
+  if (ext === 'js' || ext === 'javascript') return files.value.find(f => f.endsWith('.js') || f.endsWith('.jsx')) || ''
+  if (ext === 'vue') return files.value.find(f => f.endsWith('.vue')) || ''
+  return ''
+}
+
+const getFileIcon = (title: string, isLeaf: boolean): string => {
+  if (!isLeaf) {
+    // Folder icon - green themed like screenshot
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#16a34a" style="display:block;"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>`
+  }
+  const name = title.toLowerCase()
+  if (name === 'index.html') {
+    // HTML5 orange shield
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#ea580c" style="display:block;"><path d="M12 2L2 5l1.8 13.5L12 22l8.2-3.5L22 5z M18 9h-3.4l-0.3 3h3.4l-0.4 4.5L12 18.2l-5.3-1.7L6.3 12h3.3l-0.2-2.1H6.1l0.3-3h11.9z"/></svg>`
+  }
+  if (name === 'package.json') {
+    // package.json red icon
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#dc2626" style="display:block;"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 9h5v3H7v2H4V9zm11 5H11V9h4v5zm5-2h-3v2h-2V9h5v3z"/></svg>`
+  }
+  if (name === 'vite.config.js' || name === 'vite.config.ts') {
+    // Vite purple triangle lightning logo
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#c084fc" style="display:block;"><path d="M12 2L2 14h9v8l11-12h-9z"/></svg>`
+  }
+  if (name.endsWith('.jsx') || name.endsWith('.tsx') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.vue')) {
+    // React/JSX/JS/TS cyan atom logo
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.5" style="display:block;"><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(30 12 12)" /><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(90 12 12)" /><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(150 12 12)" /><circle cx="12" cy="12" r="1.5" fill="#22d3ee" /></svg>`
+  }
+  // Default generic document
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`
+}
+
+const viewCode = (segment: RenderSegment) => {
+  activeTab.value = 'code'
+  const guessed = guessFilePath(segment.language)
+  if (guessed && files.value.includes(guessed)) {
+    selectedKeys.value = [guessed]
+    void fetchFileContent(guessed)
+  }
+}
 
 const appId = computed(() => {
   const rawId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
@@ -604,7 +784,10 @@ const formatMarkdownToHtml = (text: string) => {
 }
 
 const applyCodeHighlight = (code: string) => {
-  let html = escapeHtml(code)
+  let html = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
   const tokens: string[] = []
 
   const token = (value: string, className: string) => {
@@ -782,6 +965,8 @@ const sendPrompt = async (promptInput?: string) => {
     }
     await loadAppInfo()
     refreshPreview()
+    await loadProjectFiles()
+    activeTab.value = 'preview'
     await scrollToBottom()
   }
 
@@ -867,6 +1052,7 @@ const handleDeploy = async () => {
     if (res.data.code === 0 && res.data.data) {
       deployedUrl.value = res.data.data
       deployModalOpen.value = true
+      activeTab.value = 'preview'
       message.success('部署成功')
       return
     }
@@ -1015,6 +1201,7 @@ onMounted(async () => {
     await loginUserStore.fetchLoginUser()
   }
   await loadAppInfo()
+  await loadProjectFiles()
   await loadChatHistory()
   const initPromptQuery = Array.isArray(route.query.initPrompt)
     ? route.query.initPrompt[0]
@@ -1091,11 +1278,12 @@ onBeforeUnmount(() => {
                   class="chat-message__text"
                   v-html="segment.html"
                 />
-                <div v-else class="chat-code-block">
-                  <div class="chat-code-block__header">
-                    {{ segment.language || 'code' }}
-                  </div>
-                  <pre class="chat-code-block__pre"><code v-html="segment.html"></code></pre>
+                <div v-else class="chat-message__code-stub">
+                  <span class="chat-message__code-stub-icon">📁</span>
+                  <span class="chat-message__code-stub-text">代码文件已生成 ({{ segment.language || 'code' }})</span>
+                  <a-button type="link" size="small" class="chat-message__code-stub-btn" @click="viewCode(segment)">
+                    查看代码
+                  </a-button>
                 </div>
               </template>
               <span v-if="item.streaming" class="chat-message__cursor">|</span>
@@ -1135,10 +1323,26 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <aside class="preview-panel">
-        <div class="preview-panel__header">
-          <h2>网页预览</h2>
-          <div v-if="previewReady && previewUrl" class="preview-panel__actions">
+      <aside class="workspace-panel">
+        <div class="workspace-panel__header">
+          <div class="workspace-tabs">
+            <div 
+              class="workspace-tab-item" 
+              :class="{ 'active': activeTab === 'preview' }" 
+              @click="activeTab = 'preview'"
+            >
+              预览
+            </div>
+            <div 
+              class="workspace-tab-item" 
+              :class="{ 'active': activeTab === 'code' }" 
+              @click="activeTab = 'code'"
+            >
+              代码
+            </div>
+          </div>
+          
+          <div v-if="activeTab === 'preview' && previewReady && previewUrl" class="preview-panel__actions">
             <a-button
               size="small"
               :type="visualEditMode ? 'primary' : 'default'"
@@ -1150,40 +1354,88 @@ onBeforeUnmount(() => {
             <a :href="previewUrl" target="_blank" rel="noopener noreferrer"> 新窗口打开 </a>
           </div>
         </div>
-        <div
-          class="preview-panel__body"
-          :class="{ 'preview-panel__body--visual-editing': visualEditMode }"
-        >
-          <iframe
-            v-if="previewReady && previewUrl"
-            ref="previewIframeRef"
-            :src="previewUrl"
-            :srcdoc="previewSrcDoc || undefined"
-            title="preview"
-            @load="handlePreviewLoad"
-          />
-          <div
-            v-if="previewReady && previewUrl && visualEditMode"
-            class="preview-panel__visual-edit-layer"
-            @pointermove="handleVisualEditPointerMove"
-            @pointerleave="handleVisualEditPointerLeave"
-            @pointerdown.prevent.stop="handleVisualEditClick"
-            @click.prevent.stop
-          >
+        
+        <div class="workspace-panel__body">
+          <!-- Preview Tab Content -->
+          <div v-show="activeTab === 'preview'" class="preview-content-wrapper">
             <div
-              v-if="activeHoverElementInfo"
-              class="preview-panel__visual-edit-box preview-panel__visual-edit-box--hover"
-              :style="getVisualEditBoxStyle(activeHoverElementInfo)"
-            ></div>
-            <div
-              v-if="selectedElementInfo"
-              class="preview-panel__visual-edit-box preview-panel__visual-edit-box--selected"
-              :style="getVisualEditBoxStyle(selectedElementInfo)"
-            ></div>
+              class="preview-panel__body"
+              :class="{ 'preview-panel__body--visual-editing': visualEditMode }"
+            >
+              <iframe
+                v-if="previewReady && previewUrl"
+                ref="previewIframeRef"
+                :src="previewUrl"
+                :srcdoc="previewSrcDoc || undefined"
+                title="preview"
+                @load="handlePreviewLoad"
+              />
+              <div
+                v-if="previewReady && previewUrl && visualEditMode"
+                class="preview-panel__visual-edit-layer"
+                @pointermove="handleVisualEditPointerMove"
+                @pointerleave="handleVisualEditPointerLeave"
+                @pointerdown.prevent.stop="handleVisualEditClick"
+                @click.prevent.stop
+              >
+                <div
+                  v-if="activeHoverElementInfo"
+                  class="preview-panel__visual-edit-box preview-panel__visual-edit-box--hover"
+                  :style="getVisualEditBoxStyle(activeHoverElementInfo)"
+                ></div>
+                <div
+                  v-if="selectedElementInfo"
+                  class="preview-panel__visual-edit-box preview-panel__visual-edit-box--selected"
+                  :style="getVisualEditBoxStyle(selectedElementInfo)"
+                ></div>
+              </div>
+              <div v-if="!previewReady || !previewUrl" class="preview-placeholder">
+                <p v-if="sending">代码生成中，完成后自动展示预览...</p>
+                <p v-else>发送消息后，生成完成会在这里展示网站效果。</p>
+              </div>
+            </div>
           </div>
-          <div v-if="!previewReady || !previewUrl" class="preview-placeholder">
-            <p v-if="sending">代码生成中，完成后自动展示预览...</p>
-            <p v-else>发送消息后，生成完成会在这里展示网站效果。</p>
+          
+          <!-- Code Tab Content -->
+          <div v-if="activeTab === 'code'" class="code-viewer-panel">
+            <aside class="code-viewer-sidebar">
+              <div class="code-viewer-sidebar__title">文件树</div>
+              <div class="code-viewer-sidebar__tree">
+                <a-tree
+                  v-model:selectedKeys="selectedKeys"
+                  :tree-data="fileTreeData"
+                  :default-expand-all="true"
+                  @select="onFileSelect"
+                  class="custom-antd-tree"
+                >
+                  <template #title="{ title, isLeaf }">
+                    <span class="tree-node-title">
+                      <span class="tree-node-icon" v-html="getFileIcon(title, isLeaf)"></span>
+                      <span class="tree-node-text">{{ title }}</span>
+                    </span>
+                  </template>
+                </a-tree>
+              </div>
+            </aside>
+            <main class="code-viewer-main">
+              <header class="code-viewer-header">
+                <span class="code-viewer-path">{{ selectedKeys[0] || '未选择文件' }}</span>
+              </header>
+              <div class="code-viewer-container">
+                <div v-if="loadingContent" class="code-viewer-loading">
+                  <a-spin />
+                </div>
+                <div v-else-if="selectedFileContent" class="code-viewer-body">
+                  <div class="code-viewer-line-numbers">
+                    <span v-for="n in lineCount" :key="n">{{ n }}</span>
+                  </div>
+                  <pre class="code-viewer-pre"><code v-html="highlightedCode"></code></pre>
+                </div>
+                <div v-else class="code-viewer-empty">
+                  <p>暂无代码内容</p>
+                </div>
+              </div>
+            </main>
           </div>
         </div>
       </aside>
@@ -1320,7 +1572,7 @@ onBeforeUnmount(() => {
   margin-top: 14px;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
   min-height: 0;
   height: auto;
 }
@@ -1739,7 +1991,8 @@ onBeforeUnmount(() => {
     min-height: 520px;
   }
 
-  .preview-panel {
+  .preview-panel,
+  .workspace-panel {
     min-height: 440px;
   }
 
@@ -1747,5 +2000,308 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* --- Segmented Tab Control Styles --- */
+.workspace-tabs {
+  display: inline-flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 9px;
+  user-select: none;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.workspace-tab-item {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.workspace-tab-item.active {
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.workspace-tab-item:hover:not(.active) {
+  color: #0f172a;
+}
+
+/* --- Workspace Layout Styles --- */
+.workspace-panel {
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-panel__header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 57px;
+  box-sizing: border-box;
+}
+
+.workspace-panel__body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-content-wrapper {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-content-wrapper .preview-panel__body {
+  flex: 1;
+}
+
+/* --- Chat Code Stub Styles --- */
+.chat-message__code-stub {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.chat-message--user .chat-message__code-stub {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-message__code-stub-icon {
+  font-size: 16px;
+}
+
+.chat-message__code-stub-text {
+  color: #334155;
+  font-weight: 500;
+  flex: 1;
+}
+
+.chat-message--user .chat-message__code-stub-text {
+  color: #fff;
+}
+
+.chat-message__code-stub-btn {
+  padding: 0;
+  height: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.chat-message--user .chat-message__code-stub-btn {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* --- IDE Code Viewer Styles --- */
+.code-viewer-panel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: #fff;
+}
+
+.code-viewer-sidebar {
+  width: 280px;
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: #f8fafc;
+}
+
+.code-viewer-sidebar__title {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-viewer-sidebar__tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 4px;
+}
+
+.custom-antd-tree {
+  background: transparent !important;
+}
+
+.custom-antd-tree :deep(.ant-tree-treenode) {
+  padding: 4px 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.custom-antd-tree :deep(.ant-tree-node-content-wrapper) {
+  display: flex !important;
+  align-items: center !important;
+  padding: 6px 8px !important;
+  border-radius: 6px !important;
+  transition: all 0.15s ease !important;
+  flex: 1 !important;
+  font-size: 13px !important;
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace !important;
+  background-color: transparent !important;
+}
+
+.custom-antd-tree :deep(.ant-tree-node-content-wrapper:hover) {
+  background-color: #f1f5f9 !important;
+}
+
+.custom-antd-tree :deep(.ant-tree-node-selected) {
+  background-color: #dbeafe !important;
+  color: #1d4ed8 !important;
+  font-weight: 500 !important;
+}
+
+.tree-node-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tree-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tree-node-text {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.code-viewer-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #1e1e1e;
+}
+
+.code-viewer-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid #2d2d2d;
+  background: #252526;
+}
+
+.code-viewer-path {
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-size: 13px;
+  color: #cccccc;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-viewer-container {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  background: #1e1e1e;
+}
+
+.code-viewer-loading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.code-viewer-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #858585;
+  font-size: 14px;
+}
+
+.code-viewer-body {
+  display: flex;
+  padding: 16px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.code-viewer-line-numbers {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  padding-right: 16px;
+  margin-right: 16px;
+  border-right: 1px solid #3c3c3c;
+  color: #858585;
+  user-select: none;
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.code-viewer-pre {
+  margin: 0;
+  flex: 1;
+  overflow-x: auto;
+  white-space: pre;
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-size: 13px;
+  line-height: 20px;
+  color: #d4d4d4;
+}
+
+/* IDE Dark Theme Highlight Tokens */
+:deep(.code-token-keyword) {
+  color: #569cd6 !important;
+  font-weight: 600 !important;
+}
+
+:deep(.code-token-string) {
+  color: #ce9178 !important;
+}
+
+:deep(.code-token-number) {
+  color: #b5cea8 !important;
+}
+
+:deep(.code-token-comment) {
+  color: #6a9955 !important;
+  font-style: italic !important;
+}
+
+:deep(.code-token-tag) {
+  color: #569cd6 !important;
 }
 </style>

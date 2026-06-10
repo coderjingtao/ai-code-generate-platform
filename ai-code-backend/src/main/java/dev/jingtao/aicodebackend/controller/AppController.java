@@ -290,6 +290,64 @@ public class AppController {
         return ResultUtils.success(appVO);
     }
 
+    /**
+     * 获取应用代码目录下的文件列表（相对路径）
+     */
+    @GetMapping("/files/{appId}")
+    public BaseResponse<List<String>> listAppFiles(@PathVariable Long appId, HttpServletRequest request) {
+        // 1.基础校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "Invalid app id");
+        // 2.查询应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "App Not Found");
+        // 3.权限校验，只有应用创建者/管理员才可以查看
+        Users loginUser = usersService.getLoginUser(request);
+        boolean isAdmin = dev.jingtao.aicodebackend.constant.UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole());
+        if(!app.getUserId().equals(loginUser.getId()) && !isAdmin){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "No permission to view this app's files");
+        }
+        // 4.构建应用代码目录路径
+        String codeGenType = app.getCodeGenType();
+        if (cn.hutool.core.util.StrUtil.isBlank(codeGenType)) {
+            return ResultUtils.success(java.util.Collections.emptyList());
+        }
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        
+        File sourceDir = new File(sourceDirPath);
+        if (!sourceDir.exists() || !sourceDir.isDirectory()) {
+            return ResultUtils.success(java.util.Collections.emptyList());
+        }
+        
+        // 5.遍历目录获取所有文件相对路径
+        List<String> filePaths = new java.util.ArrayList<>();
+        scanFiles(sourceDir, sourceDir.getAbsolutePath(), filePaths);
+        // 排序
+        java.util.Collections.sort(filePaths);
+        return ResultUtils.success(filePaths);
+    }
+
+    private void scanFiles(File dir, String rootPath, List<String> filePaths) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (file.getName().startsWith(".") 
+                    || "node_modules".equals(file.getName()) 
+                    || "dist".equals(file.getName())) {
+                continue;
+            }
+            if (file.isDirectory()) {
+                scanFiles(file, rootPath, filePaths);
+            } else {
+                String relativePath = file.getAbsolutePath().substring(rootPath.length() + 1);
+                relativePath = relativePath.replace('\\', '/');
+                filePaths.add(relativePath);
+            }
+        }
+    }
+
     @GetMapping("/download/{appId}")
     public void downloadAppCode(@PathVariable Long appId, HttpServletRequest request, HttpServletResponse response) {
         // 1.基础校验

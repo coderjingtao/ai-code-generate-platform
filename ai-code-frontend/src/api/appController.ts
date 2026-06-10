@@ -179,3 +179,18 @@ export async function updateMyApp(body: API.AppUpdateRequest, options?: { [key: 
     ...(options || {}),
   })
 }
+
+/** 获取应用生成的代码文件列表 GET /app/files/${param0} */
+export async function listAppFiles(
+  params: {
+    appId: string
+  },
+  options?: { [key: string]: any },
+) {
+  const { appId: param0, ...queryParams } = params
+  return request<{ code?: number; data?: string[]; message?: string }>('/app/files/' + param0, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  })
+}
