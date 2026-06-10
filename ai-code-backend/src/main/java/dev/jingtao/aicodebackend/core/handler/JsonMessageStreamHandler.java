@@ -142,6 +142,10 @@ public class JsonMessageStreamHandler {
                 aiMessageBuilder.append(output);
                 return output;
             }
+            case TOOL_CALL -> {
+                ToolCallMessage toolCallMessage = JSONUtil.toBean(chunk, ToolCallMessage.class);
+                return JSONUtil.toJsonStr(toolCallMessage);
+            }
             default -> {
                 log.error("Unknown message type: {}", messageType);
                 return StrUtil.EMPTY;

@@ -7,6 +7,7 @@ import dev.jingtao.aicodebackend.ai.model.HtmlCodeResult;
 import dev.jingtao.aicodebackend.ai.model.MultiFileCodeResult;
 import dev.jingtao.aicodebackend.ai.model.message.AiResponseMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ThinkingMessage;
+import dev.jingtao.aicodebackend.ai.model.message.ToolCallMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ToolExecutedMessage;
 import dev.jingtao.aicodebackend.ai.model.message.ToolRequestMessage;
 import dev.jingtao.aicodebackend.constant.AppConstant;
@@ -142,6 +143,12 @@ public class AiCodeGeneratorFacade {
                     .onPartialResponse(partialResponse -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
                         sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                        emittedChunkCount.incrementAndGet();
+                    })
+                    // 工具调用流分片
+                    .onPartialToolCall(partialToolCall -> {
+                        ToolCallMessage toolCallMessage = new ToolCallMessage(partialToolCall);
+                        sink.next(JSONUtil.toJsonStr(toolCallMessage));
                         emittedChunkCount.incrementAndGet();
                     })
                     // 工具即将执行

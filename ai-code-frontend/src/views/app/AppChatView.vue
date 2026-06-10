@@ -59,6 +59,7 @@ const previewSrcDoc = ref('')
 const inputPrompt = ref('')
 const messages = ref<ChatMessage[]>([])
 const messageContainerRef = ref<HTMLElement>()
+const codeViewerContainerRef = ref<HTMLElement>()
 const previewIframeRef = ref<HTMLIFrameElement>()
 const eventSourceRef = ref<EventSource | null>(null)
 const loadingHistory = ref(false)
@@ -86,6 +87,10 @@ const selectedKeys = ref<string[]>([])
 const selectedFileContent = ref<string>('')
 const loadingFiles = ref(false)
 const loadingContent = ref(false)
+
+const activeToolCallId = ref<string | null>(null)
+const activeToolName = ref<string | null>(null)
+const accumulatedArgs = ref<string>('')
 
 const lineCount = computed(() => {
   if (!selectedFileContent.value) return 0
@@ -182,7 +187,7 @@ const loadProjectFiles = async () => {
       if (files.value.length > 0) {
         const currentFile = selectedKeys.value[0]
         if (!currentFile || !files.value.includes(currentFile)) {
-          const defaultFile = files.value.find(f => f.endsWith('index.html')) || files.value[0]
+          const defaultFile = files.value.find(f => f.endsWith('index.html')) || files.value[0] || ''
           selectedKeys.value = [defaultFile]
           void fetchFileContent(defaultFile)
         } else {
@@ -206,6 +211,149 @@ const onFileSelect = (keys: any[], info: any) => {
   } else {
     if (selectedKeys.value.length === 0 && keys.length === 0) {
       selectedKeys.value = info.node.isLeaf ? [info.node.key] : selectedKeys.value
+    }
+  }
+}
+
+const parsePartialJson = (jsonStr: string): { relativeFilePath?: string; content?: string } => {
+  let relativeFilePath: string | undefined
+  let content: string | undefined
+
+  const fileKeyIdx = jsonStr.indexOf('"relativeFilePath"')
+  if (fileKeyIdx !== -1) {
+    const startIdx = jsonStr.indexOf(':', fileKeyIdx)
+    if (startIdx !== -1) {
+      const quoteIdx = jsonStr.indexOf('"', startIdx + 1)
+      if (quoteIdx !== -1) {
+        let endIdx = -1
+        for (let i = quoteIdx + 1; i < jsonStr.length; i++) {
+          if (jsonStr[i] === '"' && jsonStr[i - 1] !== '\\') {
+            endIdx = i
+            break
+          }
+        }
+        if (endIdx !== -1) {
+          relativeFilePath = jsonStr.slice(quoteIdx + 1, endIdx)
+        }
+      }
+    }
+  }
+
+  const contentKeyIdx = jsonStr.indexOf('"content"')
+  if (contentKeyIdx !== -1) {
+    const startIdx = jsonStr.indexOf(':', contentKeyIdx)
+    if (startIdx !== -1) {
+      const quoteIdx = jsonStr.indexOf('"', startIdx + 1)
+      if (quoteIdx !== -1) {
+        let unescapedStr = ''
+        for (let i = quoteIdx + 1; i < jsonStr.length; i++) {
+          if (jsonStr[i] === '"' && jsonStr[i - 1] !== '\\') {
+            break
+          }
+          if (jsonStr[i] === '\\' && i + 1 < jsonStr.length) {
+            const nextChar = jsonStr[i + 1]
+            if (nextChar === 'n') unescapedStr += '\n'
+            else if (nextChar === 't') unescapedStr += '\t'
+            else if (nextChar === 'r') unescapedStr += '\r'
+            else if (nextChar === '"') unescapedStr += '"'
+            else if (nextChar === '\\') unescapedStr += '\\'
+            else unescapedStr += nextChar
+            i++
+          } else {
+            unescapedStr += jsonStr[i]
+          }
+        }
+        content = unescapedStr
+      }
+    }
+  }
+
+  const newContentKeyIdx = jsonStr.indexOf('"newContent"')
+  if (newContentKeyIdx !== -1) {
+    const startIdx = jsonStr.indexOf(':', newContentKeyIdx)
+    if (startIdx !== -1) {
+      const quoteIdx = jsonStr.indexOf('"', startIdx + 1)
+      if (quoteIdx !== -1) {
+        let unescapedStr = ''
+        for (let i = quoteIdx + 1; i < jsonStr.length; i++) {
+          if (jsonStr[i] === '"' && jsonStr[i - 1] !== '\\') {
+            break
+          }
+          if (jsonStr[i] === '\\' && i + 1 < jsonStr.length) {
+            const nextChar = jsonStr[i + 1]
+            if (nextChar === 'n') unescapedStr += '\n'
+            else if (nextChar === 't') unescapedStr += '\t'
+            else if (nextChar === 'r') unescapedStr += '\r'
+            else if (nextChar === '"') unescapedStr += '"'
+            else if (nextChar === '\\') unescapedStr += '\\'
+            else unescapedStr += nextChar
+            i++
+          } else {
+            unescapedStr += jsonStr[i]
+          }
+        }
+        content = unescapedStr
+      }
+    }
+  }
+
+  if (relativeFilePath) {
+    relativeFilePath = relativeFilePath.replace(/\\(.)/g, '$1')
+  }
+
+  return { relativeFilePath, content }
+}
+
+const scrollCodeViewerToBottom = async () => {
+  await nextTick()
+  const box = codeViewerContainerRef.value
+  if (box) {
+    box.scrollTop = box.scrollHeight
+  }
+}
+
+const handleToolCallStream = (toolCall: any) => {
+  // 1. Detect if this is a new tool call and reset state
+  if (toolCall.id && toolCall.id !== activeToolCallId.value) {
+    activeToolCallId.value = toolCall.id
+    accumulatedArgs.value = ''
+    activeToolName.value = toolCall.name || null
+  }
+
+  // 2. If name is sent in a chunk, update it
+  if (toolCall.name) {
+    activeToolName.value = toolCall.name
+  }
+
+  const currentToolName = activeToolName.value
+  if (currentToolName !== 'writeFile' && currentToolName !== 'modifyFile') {
+    return
+  }
+
+  // 3. Accumulate arguments
+  if (toolCall.partialArguments) {
+    const part = toolCall.partialArguments
+    if (part.startsWith('{')) {
+      accumulatedArgs.value = part
+    } else {
+      accumulatedArgs.value += part
+    }
+  }
+
+  const { relativeFilePath, content } = parsePartialJson(accumulatedArgs.value)
+
+  if (relativeFilePath) {
+    const normalizedPath = relativeFilePath.trim()
+    if (normalizedPath && !files.value.includes(normalizedPath)) {
+      files.value.push(normalizedPath)
+    }
+
+    selectedKeys.value = [normalizedPath]
+    activeTab.value = 'code'
+
+    if (content !== undefined) {
+      selectedFileContent.value = content
+      void scrollCodeViewerToBottom()
     }
   }
 }
@@ -675,8 +823,13 @@ const extractTextFromPayload = (payload: unknown): string => {
     if (payload.trim().startsWith('{')) {
       try {
         const parsed = JSON.parse(payload)
-        if (parsed && typeof parsed === 'object' && parsed.type === 'thinking' && typeof parsed.data === 'string') {
-          return parsed.data
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.type === 'thinking' && typeof parsed.data === 'string') {
+            return parsed.data
+          }
+          if (parsed.type === 'tool_call') {
+            return ''
+          }
         }
       } catch {
         // ignore
@@ -699,8 +852,13 @@ const extractTextFromPayload = (payload: unknown): string => {
         if (val.trim().startsWith('{')) {
           try {
             const parsed = JSON.parse(val)
-            if (parsed && typeof parsed === 'object' && parsed.type === 'thinking' && typeof parsed.data === 'string') {
-              return parsed.data
+            if (parsed && typeof parsed === 'object') {
+              if (parsed.type === 'thinking' && typeof parsed.data === 'string') {
+                return parsed.data
+              }
+              if (parsed.type === 'tool_call') {
+                return ''
+              }
             }
           } catch {
             // ignore
@@ -928,6 +1086,9 @@ const sendPrompt = async (promptInput?: string) => {
   previewSrcDoc.value = ''
   previewSrcDocLoadToken += 1
   destroyVisualIframeEditor()
+  activeToolCallId.value = null
+  activeToolName.value = null
+  accumulatedArgs.value = ''
   await scrollToBottom()
 
   const assistantIndex = messages.value.length - 1
@@ -989,6 +1150,29 @@ const sendPrompt = async (promptInput?: string) => {
     if (isDonePayload(rawData, payload)) {
       void finalize(false)
       return
+    }
+
+    let innerStr = ''
+    if (payload && typeof payload === 'object') {
+      const record = payload as Record<string, unknown>
+      if (typeof record.d === 'string') {
+        innerStr = record.d
+      }
+    } else if (typeof payload === 'string') {
+      innerStr = payload
+    }
+
+    if (innerStr.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(innerStr)
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.type === 'tool_call') {
+            handleToolCallStream(parsed)
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
     const chunkText = extractTextFromPayload(payload)
@@ -1421,7 +1605,7 @@ onBeforeUnmount(() => {
               <header class="code-viewer-header">
                 <span class="code-viewer-path">{{ selectedKeys[0] || '未选择文件' }}</span>
               </header>
-              <div class="code-viewer-container">
+              <div ref="codeViewerContainerRef" class="code-viewer-container">
                 <div v-if="loadingContent" class="code-viewer-loading">
                   <a-spin />
                 </div>
