@@ -2,6 +2,7 @@ package dev.jingtao.aicodebackend.langgraph4j.ai;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
 
 /**
  * 图片收集 AI 服务接口
@@ -14,5 +15,6 @@ public interface ImageCollectionService {
      * AI 会根据需求自主选择调用相应的工具
      */
     @SystemMessage(fromResource = "prompt/image-collection-system-prompt.txt")
-    String collectImages(@UserMessage String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    String collectImages(@V("userPrompt") String userPrompt);
 }

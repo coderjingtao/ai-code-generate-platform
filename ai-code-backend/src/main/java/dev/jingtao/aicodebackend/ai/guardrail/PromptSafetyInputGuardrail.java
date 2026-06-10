@@ -39,10 +39,9 @@ public class PromptSafetyInputGuardrail implements InputGuardrail {
                 if(StrUtil.isBlank(text)){
                     return fatal("Prompt must not be empty");
                 }
-
-                if(text.length() > 1000){
-                    return fatal("Prompt is too long");
-                }
+//                if(text.length() > 1000){
+//                    return fatal("Prompt is too long");
+//                }
 
                 // 1. 敏感词检查
                 String lowerText = text.toLowerCase();

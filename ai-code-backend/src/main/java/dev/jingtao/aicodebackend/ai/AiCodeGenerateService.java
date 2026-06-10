@@ -8,6 +8,8 @@ import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import reactor.core.publisher.Flux;
 
+import dev.langchain4j.service.V;
+
 public interface AiCodeGenerateService {
 
     String generateCode(String userPrompt);
@@ -25,5 +27,6 @@ public interface AiCodeGenerateService {
     Flux<String> generateMultiFileCodeStream(String userPrompt);
 
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
-    TokenStream generateVueProjectCodeStream(@MemoryId long appId, @UserMessage String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    TokenStream generateVueProjectCodeStream(@MemoryId long appId, @V("userPrompt") String userPrompt);
 }

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { marked } from 'marked'
 
 import request from '@/request'
 import aiAvatarUrl from '@/assets/aiAvatar.png'
@@ -596,6 +597,12 @@ const formatPlainTextToHtml = (text: string) => {
   return escapeHtml(text).replace(/\n/g, '<br />')
 }
 
+const formatMarkdownToHtml = (text: string) => {
+  const escaped = escapeHtml(text)
+  const html = marked.parse(escaped, { breaks: true, gfm: true, async: false })
+  return html as string
+}
+
 const applyCodeHighlight = (code: string) => {
   let html = escapeHtml(code)
   const tokens: string[] = []
@@ -639,7 +646,7 @@ const parseMessageSegments = (content: string): RenderSegment[] => {
       const textPart = content.slice(lastIndex, match.index)
       segments.push({
         type: 'text',
-        html: formatPlainTextToHtml(textPart),
+        html: formatMarkdownToHtml(textPart),
       })
     }
 
@@ -654,11 +661,11 @@ const parseMessageSegments = (content: string): RenderSegment[] => {
   if (lastIndex < content.length) {
     segments.push({
       type: 'text',
-      html: formatPlainTextToHtml(content.slice(lastIndex)),
+      html: formatMarkdownToHtml(content.slice(lastIndex)),
     })
   }
 
-  return segments.length ? segments : [{ type: 'text', html: formatPlainTextToHtml(content) }]
+  return segments.length ? segments : [{ type: 'text', html: formatMarkdownToHtml(content) }]
 }
 
 const looksLikeCode = (content: string) => {
@@ -744,6 +751,7 @@ const sendPrompt = async (promptInput?: string) => {
   const params = new URLSearchParams({
     appId: appId.value,
     userPrompt: finalPrompt,
+    mode: 'workflow',
   })
   const streamUrl = `${baseApiUrl.value}${CHAT_STREAM_PATH}?${params.toString()}`
   const source = new EventSource(streamUrl, { withCredentials: true })
@@ -1406,6 +1414,65 @@ onBeforeUnmount(() => {
 .chat-message__text + .chat-message__text {
   margin-top: 8px;
 }
+
+.chat-message__text :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.chat-message__text :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.chat-message__text :deep(ul),
+.chat-message__text :deep(ol) {
+  margin: 0 0 8px 0;
+  padding-left: 20px;
+}
+
+.chat-message__text :deep(ul) {
+  list-style-type: disc;
+}
+
+.chat-message__text :deep(ol) {
+  list-style-type: decimal;
+}
+
+.chat-message__text :deep(li) {
+  margin-bottom: 4px;
+}
+
+.chat-message__text :deep(strong) {
+  font-weight: 600;
+}
+
+.chat-message__text :deep(code) {
+  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  background-color: rgba(0, 0, 0, 0.06);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 90%;
+}
+
+.chat-message--user .chat-message__text :deep(code) {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.chat-message__text :deep(h1),
+.chat-message__text :deep(h2),
+.chat-message__text :deep(h3),
+.chat-message__text :deep(h4),
+.chat-message__text :deep(h5),
+.chat-message__text :deep(h6) {
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+}
+
+.chat-message__text :deep(h1) { font-size: 1.25em; }
+.chat-message__text :deep(h2) { font-size: 1.15em; }
+.chat-message__text :deep(h3) { font-size: 1.05em; }
+.chat-message__text :deep(h4),
+.chat-message__text :deep(h5),
+.chat-message__text :deep(h6) { font-size: 1em; }
 
 .chat-code-block {
   margin-top: 8px;

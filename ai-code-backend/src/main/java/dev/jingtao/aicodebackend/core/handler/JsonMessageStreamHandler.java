@@ -94,7 +94,7 @@ public class JsonMessageStreamHandler {
             case AI_RESPONSE -> {
                 AiResponseMessage aiResponseMessage = JSONUtil.toBean(chunk, AiResponseMessage.class);
                 String data = aiResponseMessage.getData();
-                if(StrUtil.isBlank(data)){
+                if(StrUtil.isEmpty(data)){
                     return StrUtil.EMPTY;
                 }
                 aiMessageBuilder.append(data);
@@ -103,7 +103,7 @@ public class JsonMessageStreamHandler {
             case THINKING -> {
                 ThinkingMessage thinkingMessage = JSONUtil.toBean(chunk, ThinkingMessage.class);
                 String data = thinkingMessage.getData();
-                if(StrUtil.isBlank(data)){
+                if(StrUtil.isEmpty(data)){
                     return StrUtil.EMPTY;
                 }
                 aiMessageBuilder.append(data);
