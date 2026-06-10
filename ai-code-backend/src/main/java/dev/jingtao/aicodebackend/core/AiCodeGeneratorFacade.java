@@ -68,6 +68,18 @@ public class AiCodeGeneratorFacade {
      * @return 生成代码的实时流式字符串
      */
     public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId){
+        return generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId, false);
+    }
+
+    /**
+     * 统一入口：根据代码生成的类型，生成代码并保存到文件（流式，支持控制是否跳过构建）
+     * @param userPrompt 用户提示词
+     * @param codeGenTypeEnum 代码生成类型
+     * @param appId 应用 ID
+     * @param skipBuild 是否跳过流式结束后的构建步骤
+     * @return 生成代码的实时流式字符串
+     */
+    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, boolean skipBuild){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         var aiService = aiCodeGenerateServiceFactory.getAiService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum){
@@ -81,7 +93,7 @@ public class AiCodeGeneratorFacade {
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiService.generateVueProjectCodeStream(appId, userPrompt);
-                yield processTokenStream(tokenStream, appId);
+                yield processTokenStream(tokenStream, appId, skipBuild);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
         };
@@ -118,9 +130,10 @@ public class AiCodeGeneratorFacade {
      *
      * @param tokenStream LangChain4j 的 TokenStream 对象
      * @param appId       应用 ID
+     * @param skipBuild   是否跳过构建
      * @return 系统内部的JSON Message流
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId){
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId, boolean skipBuild){
         return Flux.create(sink -> {
             AtomicInteger emittedChunkCount = new AtomicInteger(0);
 
@@ -154,9 +167,13 @@ public class AiCodeGeneratorFacade {
                             emittedChunkCount.incrementAndGet();
                         }
                         log.info("TokenStream 完成，appId={}, emittedChunkCount={}", appId, emittedChunkCount.get());
-                        // 执行同步构建 Vue 项目，确保预览时项目已就绪
-                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
-                        vueProjectBuilder.buildProject(projectPath);
+                        if (!skipBuild) {
+                            // 执行同步构建 Vue 项目，确保预览时项目已就绪
+                            String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
+                            vueProjectBuilder.buildProject(projectPath);
+                        } else {
+                            log.info("工作流模式下跳过流式结束后的 Vue 项目构建，由后续构建节点统一执行，appId={}", appId);
+                        }
                         sink.complete();
                     })
                     // 模型出现异常

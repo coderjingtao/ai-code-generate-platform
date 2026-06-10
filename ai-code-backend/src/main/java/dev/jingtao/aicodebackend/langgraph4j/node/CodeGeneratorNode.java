@@ -35,8 +35,8 @@ public class CodeGeneratorNode {
             if(appId == null){
                 appId = 0L;
             }
-            // 调用streaming代码生成
-            Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId);
+            // 调用streaming代码生成并指定跳过初始构建（工作流模式下，由后续构建节点统一执行）
+            Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId, true);
             Consumer<String> streamConsumer = context.getStreamConsumer();
             if(streamConsumer == null && context.getStreamSessionId() != null){
                 var consumerRegistry = SpringContextUtil.getBean(WorkflowStreamConsumerRegistry.class);

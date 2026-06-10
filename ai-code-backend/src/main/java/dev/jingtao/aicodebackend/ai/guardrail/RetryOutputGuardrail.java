@@ -40,7 +40,7 @@ public class RetryOutputGuardrail implements OutputGuardrail {
         String lowerResponse = response.toLowerCase();
         String[] sensitiveWords = {
                 "密码", "password", "secret", "token",
-                "api key", "私钥", "证书", "credential"
+                "api key", "私钥", "证书"
         };
         for (String word : sensitiveWords) {
             if (lowerResponse.contains(word)) {
