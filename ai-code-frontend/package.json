@@ -16,8 +16,11 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@types/markdown-it": "^14.1.2",
     "ant-design-vue": "^4.2.6",
     "axios": "^1.14.0",
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.2.0",
     "marked": "^18.0.5",
     "pinia": "^3.0.4",
     "vue": "^3.5.30",

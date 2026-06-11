@@ -106,8 +106,8 @@ public class JsonMessageStreamHandler {
                 if(StrUtil.isEmpty(data)){
                     return StrUtil.EMPTY;
                 }
-                aiMessageBuilder.append(data);
-                // Thinking 仍实时返回前端，用于流式展示
+                // Thinking 仍实时返回前端用于流式展示，但不持久化到数据库
+                // aiMessageBuilder.append(data);
                 return JSONUtil.createObj()
                         .set("type", StreamMessageTypeEnum.THINKING.getValue())
                         .set("data", data)
@@ -137,9 +137,9 @@ public class JsonMessageStreamHandler {
                 String toolName = toolExecutedMessage.getName();
                 BaseTool tool = toolManager.getTool(toolName);
                 String result = tool.generateToolExecutedResult(jsonObject);
-                //输出前端和要持久化的内容
+                // 输出前端，但不持久化到数据库
                 String output = String.format("\n%s\n", result);
-                aiMessageBuilder.append(output);
+                // aiMessageBuilder.append(output);
                 return output;
             }
             case TOOL_CALL -> {

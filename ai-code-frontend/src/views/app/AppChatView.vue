@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { marked } from 'marked'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 
 import request from '@/request'
 import aiAvatarUrl from '@/assets/aiAvatar.png'
@@ -32,12 +34,14 @@ interface ChatMessage {
   content: string
   streaming?: boolean
   createTime?: string
+  statusText?: string
 }
 
 interface RenderSegment {
   type: 'text' | 'code'
   html: string
   language?: string
+  markdown?: string
 }
 
 type WithStringAppId<T> = Omit<T, 'appId'> & { appId: string }
@@ -85,7 +89,27 @@ const activeTab = ref<'preview' | 'code'>('preview')
 const files = ref<string[]>([])
 const selectedKeys = ref<string[]>([])
 const selectedFileContent = ref<string>('')
+const expandedKeys = ref<string[]>([])
 const loadingFiles = ref(false)
+
+const getAllFolderPaths = (fileList: string[]): string[] => {
+  const folders = new Set<string>()
+  fileList.forEach((file) => {
+    const parts = file.split('/')
+    for (let i = 1; i < parts.length; i++) {
+      folders.add(parts.slice(0, i).join('/'))
+    }
+  })
+  return Array.from(folders)
+}
+
+watch(
+  () => files.value,
+  (newFiles) => {
+    expandedKeys.value = getAllFolderPaths(newFiles)
+  },
+  { deep: true, immediate: true }
+)
 const loadingContent = ref(false)
 
 const activeToolCallId = ref<string | null>(null)
@@ -97,9 +121,21 @@ const lineCount = computed(() => {
   return selectedFileContent.value.split('\n').length
 })
 
+const getLanguageFromPath = (filePath: string | undefined): string => {
+  if (!filePath) return 'plaintext'
+  const parts = filePath.split('.')
+  const ext = parts[parts.length - 1]?.toLowerCase()
+  if (!ext) return 'plaintext'
+  if (ext === 'html' || ext === 'vue') return 'xml'
+  if (ext === 'js' || ext === 'jsx') return 'javascript'
+  if (ext === 'ts' || ext === 'tsx') return 'typescript'
+  return ext
+}
+
 const highlightedCode = computed(() => {
   if (!selectedFileContent.value) return ''
-  return applyCodeHighlight(selectedFileContent.value)
+  const lang = getLanguageFromPath(selectedKeys.value[0])
+  return applyCodeHighlight(selectedFileContent.value, lang)
 })
 
 interface AntdTreeNode {
@@ -312,7 +348,7 @@ const scrollCodeViewerToBottom = async () => {
   }
 }
 
-const handleToolCallStream = (toolCall: any) => {
+const handleToolCallStream = (toolCall: any, target?: ChatMessage) => {
   // 1. Detect if this is a new tool call and reset state
   if (toolCall.id && toolCall.id !== activeToolCallId.value) {
     activeToolCallId.value = toolCall.id
@@ -326,6 +362,25 @@ const handleToolCallStream = (toolCall: any) => {
   }
 
   const currentToolName = activeToolName.value
+  let actionText = '正在调用工具'
+  if (currentToolName === 'writeFile') {
+    actionText = '正在生成文件'
+  } else if (currentToolName === 'modifyFile') {
+    actionText = '正在修改文件'
+  } else if (currentToolName === 'deleteFile') {
+    actionText = '正在删除文件'
+  } else if (currentToolName === 'readDir') {
+    actionText = '正在读取目录'
+  } else if (currentToolName === 'readFile') {
+    actionText = '正在读取文件'
+  } else if (currentToolName) {
+    actionText = `正在执行: ${currentToolName}`
+  }
+
+  if (target) {
+    target.statusText = `${actionText}...`
+  }
+
   if (currentToolName !== 'writeFile' && currentToolName !== 'modifyFile') {
     return
   }
@@ -344,6 +399,9 @@ const handleToolCallStream = (toolCall: any) => {
 
   if (relativeFilePath) {
     const normalizedPath = relativeFilePath.trim()
+    if (target) {
+      target.statusText = `${actionText}: ${normalizedPath}`
+    }
     if (normalizedPath && !files.value.includes(normalizedPath)) {
       files.value.push(normalizedPath)
     }
@@ -935,46 +993,25 @@ const formatPlainTextToHtml = (text: string) => {
   return escapeHtml(text).replace(/\n/g, '<br />')
 }
 
-const formatMarkdownToHtml = (text: string) => {
-  const escaped = escapeHtml(text)
-  const html = marked.parse(escaped, { breaks: true, gfm: true, async: false })
-  return html as string
-}
-
-const applyCodeHighlight = (code: string) => {
-  let html = code
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  const tokens: string[] = []
-
-  const token = (value: string, className: string) => {
-    const key = `___TOKEN_${tokens.length}___`
-    tokens.push(`<span class="${className}">${value}</span>`)
-    return key
+const applyCodeHighlight = (code: string, language?: string) => {
+  try {
+    if (language && hljs.getLanguage(language)) {
+      return hljs.highlight(code, { language, ignoreIllegals: true }).value
+    }
+  } catch {
+    // ignore
   }
-
-  html = html.replace(/(&lt;!--[\s\S]*?--&gt;)/g, (match) => token(match, 'code-token-comment'))
-  html = html.replace(/(\/\*[\s\S]*?\*\/)/g, (match) => token(match, 'code-token-comment'))
-  html = html.replace(/(\/\/[^\n]*)/g, (match) => token(match, 'code-token-comment'))
-  html = html.replace(/(`[^`]*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, (match) =>
-    token(match, 'code-token-string'),
-  )
-  html = html.replace(/\b(\d+(?:\.\d+)?)\b/g, (match) => token(match, 'code-token-number'))
-  html = html.replace(
-    /\b(const|let|var|function|return|if|else|for|while|switch|case|break|continue|import|from|export|default|class|new|try|catch|finally|async|await|public|private|protected|interface|type|extends|implements|true|false|null|undefined|throw)\b/g,
-    (match) => token(match, 'code-token-keyword'),
-  )
-  html = html.replace(/(&lt;\/?[a-zA-Z][^&]*?&gt;)/g, (match) => token(match, 'code-token-tag'))
-
-  return html.replace(/___TOKEN_(\d+)___/g, (_match, index: string) => {
-    return tokens[Number(index)] || ''
-  })
+  return escapeHtml(code)
 }
 
 const parseMessageSegments = (content: string): RenderSegment[] => {
   if (!content) {
-    return [{ type: 'text', html: '' }]
+    return [{ type: 'text', html: '', markdown: '' }]
+  }
+
+  // 性能优化：如果不包含代码块标识符，直接返回文本片段，避免正则匹配消耗 CPU
+  if (!content.includes('```')) {
+    return [{ type: 'text', html: '', markdown: content }]
   }
 
   const segments: RenderSegment[] = []
@@ -987,26 +1024,29 @@ const parseMessageSegments = (content: string): RenderSegment[] => {
       const textPart = content.slice(lastIndex, match.index)
       segments.push({
         type: 'text',
-        html: formatMarkdownToHtml(textPart),
+        html: '',
+        markdown: textPart,
       })
     }
 
     segments.push({
       type: 'code',
       language: match[1]?.trim() || undefined,
-      html: applyCodeHighlight(match[2] || ''),
+      html: '', // 代码文件预览以 stub 呈现，无需在此进行高亮渲染以节省 CPU 性能
     })
     lastIndex = match.index + match[0].length
   }
 
   if (lastIndex < content.length) {
+    const textPart = content.slice(lastIndex)
     segments.push({
       type: 'text',
-      html: formatMarkdownToHtml(content.slice(lastIndex)),
+      html: '',
+      markdown: textPart,
     })
   }
 
-  return segments.length ? segments : [{ type: 'text', html: formatMarkdownToHtml(content) }]
+  return segments.length ? segments : [{ type: 'text', html: '', markdown: content }]
 }
 
 const looksLikeCode = (content: string) => {
@@ -1029,19 +1069,23 @@ const looksLikeCode = (content: string) => {
 const getMessageSegments = (messageItem: ChatMessage): RenderSegment[] => {
   if (messageItem.role === 'assistant') {
     const parsedSegments = parseMessageSegments(messageItem.content)
+    // 性能优化：如果在流式传输中，直接返回解析片段，无需进行 looksLikeCode 检测
+    if (messageItem.streaming) {
+      return parsedSegments
+    }
     const hasCodeSegment = parsedSegments.some((segment) => segment.type === 'code')
     if (!hasCodeSegment && looksLikeCode(messageItem.content)) {
       return [
         {
           type: 'code',
-          html: applyCodeHighlight(messageItem.content),
+          html: '', // 无需在此高亮渲染
           language: 'code',
         },
       ]
     }
     return parsedSegments
   }
-  return [{ type: 'text', html: formatPlainTextToHtml(messageItem.content) }]
+  return [{ type: 'text', html: formatPlainTextToHtml(messageItem.content), markdown: messageItem.content }]
 }
 
 const sendPrompt = async (promptInput?: string) => {
@@ -1116,6 +1160,7 @@ const sendPrompt = async (promptInput?: string) => {
     const target = messages.value[assistantIndex]
     if (target) {
       target.streaming = false
+      target.statusText = undefined
       if (customError) {
         target.content = target.content.trim()
           ? `${target.content}\n\n[错误] ${customError}`
@@ -1129,6 +1174,13 @@ const sendPrompt = async (promptInput?: string) => {
     await loadProjectFiles()
     activeTab.value = 'preview'
     await scrollToBottom()
+
+    // 延迟 500ms 重新加载干净的历史记录，以用数据库中的干净对话替换本地包含工具调用和思考过程的临时消息
+    setTimeout(async () => {
+      messages.value = messages.value.filter((item) => isHistoryMessage(item))
+      await loadChatHistory()
+      await scrollToBottom()
+    }, 500)
   }
 
   source.onmessage = (event) => {
@@ -1162,12 +1214,23 @@ const sendPrompt = async (promptInput?: string) => {
       innerStr = payload
     }
 
+    let shouldAppend = true
+    const target = messages.value[assistantIndex]
+
     if (innerStr.trim().startsWith('{')) {
       try {
         const parsed = JSON.parse(innerStr)
         if (parsed && typeof parsed === 'object') {
           if (parsed.type === 'tool_call') {
-            handleToolCallStream(parsed)
+            if (target) {
+              handleToolCallStream(parsed, target)
+            }
+            shouldAppend = false
+          } else if (parsed.type === 'thinking') {
+            if (target) {
+              target.statusText = '正在思考...'
+            }
+            shouldAppend = false
           }
         }
       } catch {
@@ -1175,13 +1238,49 @@ const sendPrompt = async (promptInput?: string) => {
       }
     }
 
-    const chunkText = extractTextFromPayload(payload)
-    if (chunkText) {
-      hasAnyChunk = true
-      const target = messages.value[assistantIndex]
-      if (target) {
-        target.content += chunkText
-        void scrollToBottom()
+    if (shouldAppend) {
+      if (innerStr.includes('[选择工具]')) {
+        const match = innerStr.match(/\[选择工具\]\s*(.+)/)
+        const toolName = (match && match[1]) ? match[1].trim() : '工具'
+        if (target) {
+          target.statusText = `正在准备工具: ${toolName}`
+        }
+        shouldAppend = false
+      } else if (innerStr.includes('[工具调用]')) {
+        const match = innerStr.match(/\[工具调用\]\s*(\S+)\s*(\S+)/)
+        if (target) {
+          if (match && match[1] && match[2]) {
+            const action = match[1].trim()
+            const path = match[2].trim()
+            let status = `${action}完成: ${path}`
+            if (action === '写入文件') {
+              status = `文件生成完成: ${path}`
+            } else if (action === '修改文件') {
+              status = `文件修改完成: ${path}`
+            } else if (action === '删除文件') {
+              status = `文件删除完成: ${path}`
+            } else if (action === '读取目录') {
+              status = `目录读取完成: ${path}`
+            } else if (action === '读取文件') {
+              status = `文件读取完成: ${path}`
+            }
+            target.statusText = status
+          } else {
+            target.statusText = innerStr.trim()
+          }
+        }
+        shouldAppend = false
+      }
+    }
+
+    if (shouldAppend) {
+      const chunkText = extractTextFromPayload(payload)
+      if (chunkText) {
+        hasAnyChunk = true
+        if (target) {
+          target.content += chunkText
+          void scrollToBottom()
+        }
       }
     }
   }
@@ -1458,9 +1557,14 @@ onBeforeUnmount(() => {
                 :key="`${item.id}-${index}`"
               >
                 <div
-                  v-if="segment.type === 'text'"
+                  v-if="segment.type === 'text' && item.role === 'user'"
                   class="chat-message__text"
                   v-html="segment.html"
+                />
+                <MarkdownRenderer
+                  v-else-if="segment.type === 'text' && item.role === 'assistant'"
+                  class="chat-message__text"
+                  :content="segment.markdown || ''"
                 />
                 <div v-else class="chat-message__code-stub">
                   <span class="chat-message__code-stub-icon">📁</span>
@@ -1470,6 +1574,13 @@ onBeforeUnmount(() => {
                   </a-button>
                 </div>
               </template>
+              <div
+                v-if="item.role === 'assistant' && item.streaming && item.statusText"
+                class="chat-message__status"
+              >
+                <span class="chat-message__status-spinner"></span>
+                <span class="chat-message__status-text">{{ item.statusText }}</span>
+              </div>
               <span v-if="item.streaming" class="chat-message__cursor">|</span>
             </div>
           </div>
@@ -1587,8 +1698,8 @@ onBeforeUnmount(() => {
               <div class="code-viewer-sidebar__tree">
                 <a-tree
                   v-model:selectedKeys="selectedKeys"
+                  v-model:expandedKeys="expandedKeys"
                   :tree-data="fileTreeData"
-                  :default-expand-all="true"
                   @select="onFileSelect"
                   class="custom-antd-tree"
                 >
@@ -1975,6 +2086,37 @@ onBeforeUnmount(() => {
   display: inline-block;
   margin-left: 2px;
   animation: blink 1s infinite;
+}
+
+.chat-message__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #1e40af;
+  background: rgba(37, 99, 235, 0.05);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+  width: fit-content;
+}
+
+.chat-message__status-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(30, 64, 175, 0.2);
+  border-top-color: #1e40af;
+  border-radius: 50%;
+  animation: status-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-panel__editor {
