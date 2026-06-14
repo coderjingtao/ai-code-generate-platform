@@ -27,6 +27,9 @@ public class WorkflowCodeGenEngine implements CodeGenEngine{
 
     @Override
     public Flux<AppGenerationMessage> generateEvent(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum) {
-        throw new UnsupportedOperationException("WorkflowCodeGenEngine does not support AppGenerationMessage event generation");
+        // 工作流模式尚未提供 v2 结构化事件流（节点只产出原始代码块 Flux<String>）。
+        // 这里以一条错误事件优雅降级，避免同步抛异常使请求直接失败。
+        return Flux.just(AppGenerationMessage.error(appId,
+                "工作流模式暂不支持实时事件流（v2），请切换为经典模式后重试"));
     }
 }

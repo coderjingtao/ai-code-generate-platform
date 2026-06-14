@@ -109,6 +109,20 @@ public class AppGenerationMessage extends StreamMessage{
     }
 
     /**
+     * 文件删除事件
+     * @param appId 应用 ID
+     * @param path 文件相对路径
+     */
+    public static AppGenerationMessage fileDelete(Long appId, String path) {
+        AppGenerationMessage message = new AppGenerationMessage(StreamMessageTypeEnum.FILE_DELETE.getValue());
+        message.setAppId(appId);
+        message.setPath(path);
+        message.setStatus("done");
+        message.setMessage(path + " 已删除");
+        return message;
+    }
+
+    /**
      * 构建状态事件（用于 Vue/React 项目构建进度通知）
      * @param appId 应用 ID
      * @param status 构建状态（building / success / error）

@@ -132,6 +132,56 @@ public class AppFileServiceImpl implements AppFileService {
     }
 
     /**
+     * 读取文件内容（显式指定类型，文件不存在返回 null）
+     */
+    @Override
+    public String readFileContent(Long appId, CodeGenTypeEnum codeGenType, String path) {
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.OPERATION_ERROR, "代码生成类型不能为空");
+        Path root = getRootPath(appId, codeGenType.getValue());
+        Path filePath = resolveSafePath(root, path);
+        if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+            return null;
+        }
+        try {
+            return Files.readString(filePath, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, e.getMessage());
+        }
+    }
+
+    /**
+     * 删除文件（文件不存在返回 false）
+     */
+    @Override
+    public boolean deleteFile(Long appId, CodeGenTypeEnum codeGenType, String path) {
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.OPERATION_ERROR, "代码生成类型不能为空");
+        Path root = getRootPath(appId, codeGenType.getValue());
+        Path filePath = resolveSafePath(root, path);
+        if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+            return false;
+        }
+        try {
+            Files.delete(filePath);
+            return true;
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, e.getMessage());
+        }
+    }
+
+    /**
+     * 将相对路径安全解析为应用目录下的绝对路径，relativePath 为空时返回应用根目录
+     */
+    @Override
+    public Path resolveSafePath(Long appId, CodeGenTypeEnum codeGenType, String relativePath) {
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.OPERATION_ERROR, "代码生成类型不能为空");
+        Path root = getRootPath(appId, codeGenType.getValue());
+        if (StrUtil.isBlank(relativePath)) {
+            return root;
+        }
+        return resolveSafePath(root, relativePath);
+    }
+
+    /**
      * 获取并校验应用信息，确保用户有权限访问
      * @param appId 应用 ID
      * @param loginUser 登录用户

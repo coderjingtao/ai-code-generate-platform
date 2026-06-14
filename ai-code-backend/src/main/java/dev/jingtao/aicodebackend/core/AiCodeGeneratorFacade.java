@@ -295,9 +295,9 @@ public class AiCodeGeneratorFacade {
                 // AI普通文本分片
                 .onPartialResponse(partialResponse ->
                         sink.next(AppGenerationMessage.assistantMessage(appId, partialResponse)))
-                // 工具调用流分片
-                .onPartialToolCall(partialToolCall ->
-                        sink.next(AppGenerationMessage.toolCall(appId, "正在执行工具：" + partialToolCall.name())))
+                // 工具即将执行：参数已完整，每个工具只触发一次（替代会按分片重复触发的 onPartialToolCall，避免刷屏）
+                .beforeToolExecution(beforeToolExecution ->
+                        sink.next(AppGenerationMessage.toolCall(appId, "正在执行工具：" + beforeToolExecution.request().name())))
                 // 工具执行完成
                 .onToolExecuted(toolExecution -> {
                     String toolName = toolExecution.request().name();
@@ -351,15 +351,21 @@ public class AiCodeGeneratorFacade {
             } else if ("file_done".equals(event.getType())) {
                 String content = pendingFileContent.remove(event.getPath());
                 if (content != null) {
-                    appFileService.writeFile(event.getAppId(), codeGenType, event.getPath(), content);
+                    // 先计入已完成文件（无论写盘成功与否），保证兜底解析的判定正确
                     savedFileCount.incrementAndGet();
+                    try {
+                        appFileService.writeFile(event.getAppId(), codeGenType, event.getPath(), content);
+                    } catch (Exception e) {
+                        // 单个文件写盘失败只记录日志，不中断整个生成流
+                        log.error("写入文件失败，appId={}, path={}, error={}", event.getAppId(), event.getPath(), e.getMessage(), e);
+                    }
                 }
             }
         }
     }
 
     /**
-     * 解析工具调用参数，提取 writeFile / modifyFile 的文件路径和内容并发射文件事件
+     * 解析工具调用参数，提取 writeFile / modifyFile / deleteFile 的文件路径并发射对应的文件事件
      */
     private void emitToolFileEvents(Long appId, String toolName, String arguments,
                                     java.util.function.Consumer<AppGenerationMessage> consumer) {
@@ -383,6 +389,11 @@ public class AiCodeGeneratorFacade {
                     consumer.accept(AppGenerationMessage.fileStart(appId, path));
                     consumer.accept(AppGenerationMessage.fileDelta(appId, path, content, true));
                     consumer.accept(AppGenerationMessage.fileDone(appId, path));
+                }
+            } else if ("deleteFile".equals(toolName)) {
+                String path = jsonObject.getStr("relativeFilePath");
+                if (path != null) {
+                    consumer.accept(AppGenerationMessage.fileDelete(appId, path));
                 }
             }
         } catch (Exception e) {

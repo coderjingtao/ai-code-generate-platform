@@ -3,16 +3,17 @@ package dev.jingtao.aicodebackend.ai.tools;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
-import dev.jingtao.aicodebackend.constant.AppConstant;
+import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
+import dev.jingtao.aicodebackend.service.AppFileService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 
@@ -39,6 +40,9 @@ public class FileDirReadTool extends BaseTool{
             ".log", ".tmp", ".cache", ".lock"
     );
 
+    @Resource
+    private AppFileService appFileService;
+
     @Tool("读取目录结构，获取指定目录下的所有文件和子目录信息")
     public String readDir(
             @P("目录的相对路径，为空则读取整个项目结构")
@@ -46,12 +50,8 @@ public class FileDirReadTool extends BaseTool{
             @ToolMemoryId Long appId
     ) {
         try {
-            Path path = Paths.get(relativeDirPath == null ? "" : relativeDirPath);
-            if (!path.isAbsolute()) {
-                String projectDirName = "vue_project_" + appId;
-                Path projectRoot = Paths.get(AppConstant.CODE_OUTPUT_ROOT_DIR, projectDirName);
-                path = projectRoot.resolve(relativeDirPath == null ? "" : relativeDirPath);
-            }
+            // 统一通过 AppFileService 解析目录：自带路径穿越校验与目录布局
+            Path path = appFileService.resolveSafePath(appId, CodeGenTypeEnum.VUE_PROJECT, relativeDirPath);
             File targetDir = path.toFile();
             if (!targetDir.exists() || !targetDir.isDirectory()) {
                 return "错误：目录不存在或不是目录 - " + relativeDirPath;

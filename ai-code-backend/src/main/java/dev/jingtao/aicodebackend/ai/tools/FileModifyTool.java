@@ -1,18 +1,14 @@
 package dev.jingtao.aicodebackend.ai.tools;
 
 import cn.hutool.json.JSONObject;
-import dev.jingtao.aicodebackend.constant.AppConstant;
+import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
+import dev.jingtao.aicodebackend.service.AppFileService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 
 /**
  * 文件修改工具
@@ -21,6 +17,10 @@ import java.nio.file.StandardOpenOption;
 @Component
 @Slf4j
 public class FileModifyTool extends BaseTool{
+
+    @Resource
+    private AppFileService appFileService;
+
     @Tool("修改文件内容，用新内容替换指定的旧内容")
     public String modifyFile(
             @P("文件的相对路径")
@@ -32,16 +32,10 @@ public class FileModifyTool extends BaseTool{
             @ToolMemoryId Long appId
     ) {
         try {
-            Path path = Paths.get(relativeFilePath);
-            if (!path.isAbsolute()) {
-                String projectDirName = "vue_project_" + appId;
-                Path projectRoot = Paths.get(AppConstant.CODE_OUTPUT_ROOT_DIR, projectDirName);
-                path = projectRoot.resolve(relativeFilePath);
-            }
-            if (!Files.exists(path) || !Files.isRegularFile(path)) {
+            String originalContent = appFileService.readFileContent(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath);
+            if (originalContent == null) {
                 return "错误：文件不存在或不是文件 - " + relativeFilePath;
             }
-            String originalContent = Files.readString(path);
             if (!originalContent.contains(oldContent)) {
                 return "警告：文件中未找到要替换的内容，文件未修改 - " + relativeFilePath;
             }
@@ -49,10 +43,10 @@ public class FileModifyTool extends BaseTool{
             if (originalContent.equals(modifiedContent)) {
                 return "信息：替换后文件内容未发生变化 - " + relativeFilePath;
             }
-            Files.writeString(path, modifiedContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            log.info("成功修改文件: {}", path.toAbsolutePath());
+            appFileService.writeFile(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath, modifiedContent);
+            log.info("成功修改文件: appId={}, path={}", appId, relativeFilePath);
             return "文件修改成功: " + relativeFilePath;
-        } catch (IOException e) {
+        } catch (Exception e) {
             String errorMessage = "修改文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
             log.error(errorMessage, e);
             return errorMessage;
@@ -77,12 +71,12 @@ public class FileModifyTool extends BaseTool{
         // 显示对比内容
         return String.format("""
                 [工具调用] %s %s
-                
+
                 替换前：
                 ```
                 %s
                 ```
-                
+
                 替换后：
                 ```
                 %s
