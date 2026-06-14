@@ -2,6 +2,7 @@ package dev.jingtao.aicodebackend.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.model.dto.app.AppAddRequest;
 import dev.jingtao.aicodebackend.model.dto.app.AppAdminUpdateRequest;
 import dev.jingtao.aicodebackend.model.dto.app.AppQueryRequest;
@@ -30,7 +31,7 @@ public interface AppService extends IService<App> {
      * @return AI返回的流式字符串
      */
     Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode);
-
+    Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String mode);
     /**
      * 创建应用
      *

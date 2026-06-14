@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import dev.jingtao.aicodebackend.ai.AiCodeGenTypeRoutingService;
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
 import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
@@ -111,6 +112,64 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         Flux<String> codeStream = codeGenEngine.generate(appId, userPrompt, loginUser, codeGenTypeEnum);
         // 7.收集AI响应内容并在完成后添加到对话历史中
         return streamHandlerExecutor.doExecute(codeStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
+    }
+
+    @Override
+    public Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String mode) {
+        // 1.参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
+        ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
+        // 2.查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR,"应用不存在");
+        // 3.权限校验
+        ThrowUtils.throwIf(ObjectUtil.notEqual(app.getUserId(),loginUser.getId()),ErrorCode.NO_AUTH_ERROR,"无权限访问应用");
+        // 4.获取代码的生成类型
+        String codeGenType = app.getCodeGenType();
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的代码生成类型："+ codeGenType);
+
+        CodeGenModeEnum codeGenMode = CodeGenModeEnum.getEnumByValue(mode);
+        CodeGenEngine codeGenEngine = getCodeGenEngine(codeGenMode);
+        // 5.添加[用户消息]到对话历史
+        chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
+        // 6.根据选择的代码引擎来生成代码
+        StringBuilder aiResponseBuilder = new StringBuilder();
+        Flux<AppGenerationMessage> eventStream = codeGenEngine.generateEvent(appId, userPrompt, loginUser, codeGenTypeEnum);
+        // 7.收集AI响应内容并在完成后添加到对话历史中
+//        return streamHandlerExecutor.doExecute(eventStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
+
+        return eventStream
+                .doOnNext(event -> collectNonCodeMessage(event, aiResponseBuilder))
+                .doOnComplete(() -> {
+                    String aiResponse = aiResponseBuilder.toString();
+                    if(StrUtil.isNotBlank(aiResponse)) {
+                        chatHistoryService.addChatHistory(appId,aiResponse,ChatHistoryMessageTypeEnum.AI.getValue(),loginUser.getId());
+                    }
+                })
+                .doOnError(error -> {
+                    String errorMessage = "AI回复失败：" + error.getMessage();
+                    chatHistoryService.addChatHistory(appId,errorMessage,ChatHistoryMessageTypeEnum.AI.getValue(),loginUser.getId());
+                });
+    }
+    /**
+     * 从事件流中收集非代码文件内容（文本响应、工具提示等），用于保存为 AI 对话历史
+     */
+    private void collectNonCodeMessage(AppGenerationMessage event, StringBuilder aiResponseBuilder) {
+        if (event == null || StrUtil.isBlank(event.getType())) {
+            return;
+        }
+        switch (event.getType()) {
+            case "assistant_message" -> aiResponseBuilder.append(event.getContent());
+            case "tool_call", "build_status", "preview_ready", "generation_error" -> {
+                String message = StrUtil.blankToDefault(event.getMessage(), event.getContent());
+                if (StrUtil.isNotBlank(message)) {
+                    aiResponseBuilder.append("\n\n").append(message).append("\n");
+                }
+            }
+            default -> {
+            }
+        }
     }
 
     @Override

@@ -108,7 +108,7 @@ watch(
   (newFiles) => {
     expandedKeys.value = getAllFolderPaths(newFiles)
   },
-  { deep: true, immediate: true }
+  { deep: true, immediate: true },
 )
 const loadingContent = ref(false)
 
@@ -223,7 +223,8 @@ const loadProjectFiles = async () => {
       if (files.value.length > 0) {
         const currentFile = selectedKeys.value[0]
         if (!currentFile || !files.value.includes(currentFile)) {
-          const defaultFile = files.value.find(f => f.endsWith('index.html')) || files.value[0] || ''
+          const defaultFile =
+            files.value.find((f) => f.endsWith('index.html')) || files.value[0] || ''
           selectedKeys.value = [defaultFile]
           void fetchFileContent(defaultFile)
         } else {
@@ -422,10 +423,11 @@ const guessFilePath = (language?: string): string => {
     return language
   }
   const ext = language.toLowerCase()
-  if (ext === 'html') return files.value.find(f => f.endsWith('.html')) || ''
-  if (ext === 'css') return files.value.find(f => f.endsWith('.css')) || ''
-  if (ext === 'js' || ext === 'javascript') return files.value.find(f => f.endsWith('.js') || f.endsWith('.jsx')) || ''
-  if (ext === 'vue') return files.value.find(f => f.endsWith('.vue')) || ''
+  if (ext === 'html') return files.value.find((f) => f.endsWith('.html')) || ''
+  if (ext === 'css') return files.value.find((f) => f.endsWith('.css')) || ''
+  if (ext === 'js' || ext === 'javascript')
+    return files.value.find((f) => f.endsWith('.js') || f.endsWith('.jsx')) || ''
+  if (ext === 'vue') return files.value.find((f) => f.endsWith('.vue')) || ''
   return ''
 }
 
@@ -447,7 +449,13 @@ const getFileIcon = (title: string, isLeaf: boolean): string => {
     // Vite purple triangle lightning logo
     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="#c084fc" style="display:block;"><path d="M12 2L2 14h9v8l11-12h-9z"/></svg>`
   }
-  if (name.endsWith('.jsx') || name.endsWith('.tsx') || name.endsWith('.js') || name.endsWith('.ts') || name.endsWith('.vue')) {
+  if (
+    name.endsWith('.jsx') ||
+    name.endsWith('.tsx') ||
+    name.endsWith('.js') ||
+    name.endsWith('.ts') ||
+    name.endsWith('.vue')
+  ) {
     // React/JSX/JS/TS cyan atom logo
     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.5" style="display:block;"><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(30 12 12)" /><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(90 12 12)" /><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(150 12 12)" /><circle cx="12" cy="12" r="1.5" fill="#22d3ee" /></svg>`
   }
@@ -1085,7 +1093,13 @@ const getMessageSegments = (messageItem: ChatMessage): RenderSegment[] => {
     }
     return parsedSegments
   }
-  return [{ type: 'text', html: formatPlainTextToHtml(messageItem.content), markdown: messageItem.content }]
+  return [
+    {
+      type: 'text',
+      html: formatPlainTextToHtml(messageItem.content),
+      markdown: messageItem.content,
+    },
+  ]
 }
 
 const sendPrompt = async (promptInput?: string) => {
@@ -1139,7 +1153,7 @@ const sendPrompt = async (promptInput?: string) => {
   const params = new URLSearchParams({
     appId: appId.value,
     userPrompt: finalPrompt,
-    mode: 'workflow',
+    mode: 'classic',
   })
   const streamUrl = `${baseApiUrl.value}${CHAT_STREAM_PATH}?${params.toString()}`
   const source = new EventSource(streamUrl, { withCredentials: true })
@@ -1241,7 +1255,7 @@ const sendPrompt = async (promptInput?: string) => {
     if (shouldAppend) {
       if (innerStr.includes('[选择工具]')) {
         const match = innerStr.match(/\[选择工具\]\s*(.+)/)
-        const toolName = (match && match[1]) ? match[1].trim() : '工具'
+        const toolName = match && match[1] ? match[1].trim() : '工具'
         if (target) {
           target.statusText = `正在准备工具: ${toolName}`
         }
@@ -1568,8 +1582,15 @@ onBeforeUnmount(() => {
                 />
                 <div v-else class="chat-message__code-stub">
                   <span class="chat-message__code-stub-icon">📁</span>
-                  <span class="chat-message__code-stub-text">代码文件已生成 ({{ segment.language || 'code' }})</span>
-                  <a-button type="link" size="small" class="chat-message__code-stub-btn" @click="viewCode(segment)">
+                  <span class="chat-message__code-stub-text"
+                    >代码文件已生成 ({{ segment.language || 'code' }})</span
+                  >
+                  <a-button
+                    type="link"
+                    size="small"
+                    class="chat-message__code-stub-btn"
+                    @click="viewCode(segment)"
+                  >
                     查看代码
                   </a-button>
                 </div>
@@ -1621,23 +1642,26 @@ onBeforeUnmount(() => {
       <aside class="workspace-panel">
         <div class="workspace-panel__header">
           <div class="workspace-tabs">
-            <div 
-              class="workspace-tab-item" 
-              :class="{ 'active': activeTab === 'preview' }" 
+            <div
+              class="workspace-tab-item"
+              :class="{ active: activeTab === 'preview' }"
               @click="activeTab = 'preview'"
             >
               预览
             </div>
-            <div 
-              class="workspace-tab-item" 
-              :class="{ 'active': activeTab === 'code' }" 
+            <div
+              class="workspace-tab-item"
+              :class="{ active: activeTab === 'code' }"
               @click="activeTab = 'code'"
             >
               代码
             </div>
           </div>
-          
-          <div v-if="activeTab === 'preview' && previewReady && previewUrl" class="preview-panel__actions">
+
+          <div
+            v-if="activeTab === 'preview' && previewReady && previewUrl"
+            class="preview-panel__actions"
+          >
             <a-button
               size="small"
               :type="visualEditMode ? 'primary' : 'default'"
@@ -1649,7 +1673,7 @@ onBeforeUnmount(() => {
             <a :href="previewUrl" target="_blank" rel="noopener noreferrer"> 新窗口打开 </a>
           </div>
         </div>
-        
+
         <div class="workspace-panel__body">
           <!-- Preview Tab Content -->
           <div v-show="activeTab === 'preview'" class="preview-content-wrapper">
@@ -1690,7 +1714,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- Code Tab Content -->
           <div v-if="activeTab === 'code'" class="code-viewer-panel">
             <aside class="code-viewer-sidebar">
@@ -1993,7 +2017,12 @@ onBeforeUnmount(() => {
 }
 
 .chat-message__text :deep(code) {
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-family:
+    SFMono-Regular,
+    Consolas,
+    Liberation Mono,
+    Menlo,
+    monospace;
   background-color: rgba(0, 0, 0, 0.06);
   padding: 2px 4px;
   border-radius: 4px;
@@ -2014,12 +2043,20 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-.chat-message__text :deep(h1) { font-size: 1.25em; }
-.chat-message__text :deep(h2) { font-size: 1.15em; }
-.chat-message__text :deep(h3) { font-size: 1.05em; }
+.chat-message__text :deep(h1) {
+  font-size: 1.25em;
+}
+.chat-message__text :deep(h2) {
+  font-size: 1.15em;
+}
+.chat-message__text :deep(h3) {
+  font-size: 1.05em;
+}
 .chat-message__text :deep(h4),
 .chat-message__text :deep(h5),
-.chat-message__text :deep(h6) { font-size: 1em; }
+.chat-message__text :deep(h6) {
+  font-size: 1em;
+}
 
 .chat-code-block {
   margin-top: 8px;
@@ -2351,7 +2388,9 @@ onBeforeUnmount(() => {
 .workspace-tab-item.active {
   background: #fff;
   color: #0f172a;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .workspace-tab-item:hover:not(.active) {
@@ -2494,7 +2533,12 @@ onBeforeUnmount(() => {
   transition: all 0.15s ease !important;
   flex: 1 !important;
   font-size: 13px !important;
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace !important;
+  font-family:
+    SFMono-Regular,
+    Consolas,
+    Liberation Mono,
+    Menlo,
+    monospace !important;
   background-color: transparent !important;
 }
 
@@ -2545,7 +2589,12 @@ onBeforeUnmount(() => {
 }
 
 .code-viewer-path {
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-family:
+    SFMono-Regular,
+    Consolas,
+    Liberation Mono,
+    Menlo,
+    monospace;
   font-size: 13px;
   color: #cccccc;
   font-weight: 500;
@@ -2592,7 +2641,12 @@ onBeforeUnmount(() => {
   border-right: 1px solid #3c3c3c;
   color: #858585;
   user-select: none;
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-family:
+    SFMono-Regular,
+    Consolas,
+    Liberation Mono,
+    Menlo,
+    monospace;
   font-size: 13px;
   line-height: 20px;
 }
@@ -2602,7 +2656,12 @@ onBeforeUnmount(() => {
   flex: 1;
   overflow-x: auto;
   white-space: pre;
-  font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+  font-family:
+    SFMono-Regular,
+    Consolas,
+    Liberation Mono,
+    Menlo,
+    monospace;
   font-size: 13px;
   line-height: 20px;
   color: #d4d4d4;

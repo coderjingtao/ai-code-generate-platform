@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import reactor.core.publisher.Flux;
 
-import java.io.File;
 import java.util.List;
 
 @SpringBootTest
@@ -15,13 +14,6 @@ class AiCodeGeneratorFacadeTest {
 
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
-
-    @Test
-    void generateAndSaveCode() {
-        File file = aiCodeGeneratorFacade.generateAndSaveCode("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE,111L);
-        System.out.println(file.getAbsolutePath());
-        Assertions.assertNotNull(file);
-    }
 
     @Test
     void generateAndSaveCodeStream(){

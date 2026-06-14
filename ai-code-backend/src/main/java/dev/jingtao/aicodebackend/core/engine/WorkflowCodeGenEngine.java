@@ -1,5 +1,6 @@
 package dev.jingtao.aicodebackend.core.engine;
 
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.langgraph4j.CodeGenWorkflow;
 import dev.jingtao.aicodebackend.model.entity.Users;
 import dev.jingtao.aicodebackend.model.enums.CodeGenModeEnum;
@@ -22,5 +23,10 @@ public class WorkflowCodeGenEngine implements CodeGenEngine{
     @Override
     public Flux<String> generate(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum) {
         return codeGenWorkflow.executeWorkflowForUserChat(userPrompt,appId,codeGenTypeEnum);
+    }
+
+    @Override
+    public Flux<AppGenerationMessage> generateEvent(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum) {
+        throw new UnsupportedOperationException("WorkflowCodeGenEngine does not support AppGenerationMessage event generation");
     }
 }

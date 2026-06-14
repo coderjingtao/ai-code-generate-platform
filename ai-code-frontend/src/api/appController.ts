@@ -81,7 +81,7 @@ export async function chatToGenCode(
     method: 'GET',
     params: {
       // mode has a default value: classic
-      mode: 'workflow',
+      mode: 'classic',
       ...params,
     },
     ...(options || {}),
