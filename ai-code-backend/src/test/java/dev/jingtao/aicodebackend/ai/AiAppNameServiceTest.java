@@ -1,0 +1,30 @@
+package dev.jingtao.aicodebackend.ai;
+
+import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+@Slf4j
+public class AiAppNameServiceTest {
+
+    @Resource
+    private AiAppNameGeneratorService aiAppNameGeneratorService;
+
+    @Test
+    public void testRouteCodeGenType(){
+        String userPrompt = "设计一个婚礼请柬网站";
+        String name = aiAppNameGeneratorService.generateAppName(userPrompt);
+        log.info("用户需求: {} -> {}", userPrompt, name);
+        userPrompt = "做一个2046小游戏";
+        name = aiAppNameGeneratorService.generateAppName(userPrompt);
+        log.info("用户需求: {} -> {}", userPrompt, name);
+        userPrompt = "做一个电商管理系统，包含用户管理、商品管理、订单管理，需要路由和状态管理";
+        name = aiAppNameGeneratorService.generateAppName(userPrompt);
+        log.info("用户需求: {} -> {}", userPrompt, name);
+        userPrompt = "做一个花店电商的落地页";
+        name = aiAppNameGeneratorService.generateAppName(userPrompt);
+        log.info("用户需求: {} -> {}", userPrompt, name);
+    }
+}

@@ -45,6 +45,9 @@ import java.io.File;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -227,11 +230,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 使用 AI 智能选择App Name
-        app.setAppName(generateAppName(initPrompt));
-        // 使用 AI 智能选择代码生成类型
-        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
-        app.setCodeGenType(selectedCodeGenType.getValue());
+        // 并行执行两次 AI 调用（智能起名 + 代码类型路由），总耗时约为两者的较大值而非之和
+        try (var aiExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var appNameFuture = CompletableFuture
+                    .supplyAsync(() -> generateAppName(initPrompt), aiExecutor);
+            var codeGenTypeFuture = CompletableFuture
+                    .supplyAsync(() -> aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt), aiExecutor);
+            app.setAppName(appNameFuture.join());
+            app.setCodeGenType(codeGenTypeFuture.join().getValue());
+        } catch (CompletionException e) {
+            // 起名内部已兜底不会抛，这里主要兜住代码类型路由的失败
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            log.error("创建应用时 AI 调用失败：{}", cause.getMessage(), cause);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "创建应用失败：" + cause.getMessage());
+        }
         app.setInitPrompt(appAddRequest.getInitPrompt());
         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
         // 保存到数据库

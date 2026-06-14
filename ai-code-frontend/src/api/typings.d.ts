@@ -61,6 +61,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponseListString = {
+    code?: number
+    data?: string[]
+    message?: string
+  }
+
   type BaseResponseLoginUserVO = {
     code?: number
     data?: LoginUserVO
@@ -139,6 +145,11 @@ declare namespace API {
     mode?: string
   }
 
+  type chatToGenCodeV2Params = {
+    appId: number
+    userPrompt: string
+  }
+
   type DeleteRequest = {
     id?: number
   }
@@ -205,6 +216,10 @@ declare namespace API {
     appId: number
     pageSize?: number
     lastCreateTime?: string
+  }
+
+  type listAppFilesParams = {
+    appId: number
   }
 
   type LoginUserVO = {
@@ -347,5 +362,6 @@ declare namespace API {
     logos?: ImageResource[]
     streamSessionId?: string
     streamConsumer?: Record<string, any>
+    eventConsumer?: Record<string, any>
   }
 }
