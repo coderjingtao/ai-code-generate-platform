@@ -1,5 +1,6 @@
 package dev.jingtao.aicodebackend.langgraph4j.state;
 
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.langgraph4j.model.ImageCollectionPlan;
 import dev.jingtao.aicodebackend.langgraph4j.model.ImageResource;
 import dev.jingtao.aicodebackend.langgraph4j.model.QualityResult;
@@ -110,6 +111,11 @@ public class WorkflowContext implements Serializable {
      * 流式分片回调（仅运行时使用，不参与序列化）
      */
     private transient Consumer<String> streamConsumer;
+
+    /**
+     * v2 事件分片回调（仅运行时使用，不参与序列化）
+     */
+    private transient Consumer<AppGenerationMessage> eventConsumer;
 
     // ========== 上下文操作方法 ==========
 

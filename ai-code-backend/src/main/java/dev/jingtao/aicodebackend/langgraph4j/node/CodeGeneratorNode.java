@@ -1,5 +1,6 @@
 package dev.jingtao.aicodebackend.langgraph4j.node;
 
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
 import dev.jingtao.aicodebackend.langgraph4j.model.QualityResult;
@@ -35,19 +36,32 @@ public class CodeGeneratorNode {
             if(appId == null){
                 appId = 0L;
             }
-            // 调用streaming代码生成并指定跳过初始构建（工作流模式下，由后续构建节点统一执行）
-            Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId, true);
-            Consumer<String> streamConsumer = context.getStreamConsumer();
-            if(streamConsumer == null && context.getStreamSessionId() != null){
+            // 优先走 v2 事件流：存在事件消费者时用事件版 facade 转发结构化事件，否则回退 v1 字符串流。
+            // 两者均跳过初始构建（工作流模式下由后续构建节点统一执行）
+            Consumer<AppGenerationMessage> eventConsumer = context.getEventConsumer();
+            if(eventConsumer == null && context.getStreamSessionId() != null){
                 var consumerRegistry = SpringContextUtil.getBean(WorkflowStreamConsumerRegistry.class);
-                streamConsumer = consumerRegistry.get(context.getStreamSessionId());
+                eventConsumer = consumerRegistry.getEvent(context.getStreamSessionId());
             }
-            if(streamConsumer != null){
-                codeStream.doOnNext(streamConsumer)
+            if(eventConsumer != null){
+                codeGeneratorFacade.generateAndSaveCodeEventStream(userMessage, generationType, appId, true)
+                        .doOnNext(eventConsumer)
                         .blockLast(Duration.ofMinutes(10)); //最多等待10分钟
-            } else{
-                // 同步等待流式输出完成
-                codeStream.blockLast(Duration.ofMinutes(10)); //最多等待10分钟
+            } else {
+                // 调用streaming代码生成并指定跳过初始构建（工作流模式下，由后续构建节点统一执行）
+                Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId, true);
+                Consumer<String> streamConsumer = context.getStreamConsumer();
+                if(streamConsumer == null && context.getStreamSessionId() != null){
+                    var consumerRegistry = SpringContextUtil.getBean(WorkflowStreamConsumerRegistry.class);
+                    streamConsumer = consumerRegistry.get(context.getStreamSessionId());
+                }
+                if(streamConsumer != null){
+                    codeStream.doOnNext(streamConsumer)
+                            .blockLast(Duration.ofMinutes(10)); //最多等待10分钟
+                } else{
+                    // 同步等待流式输出完成
+                    codeStream.blockLast(Duration.ofMinutes(10)); //最多等待10分钟
+                }
             }
 
             // 根据类型设置生成目录

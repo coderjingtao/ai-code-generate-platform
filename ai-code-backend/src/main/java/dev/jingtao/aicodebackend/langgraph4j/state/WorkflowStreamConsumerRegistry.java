@@ -1,5 +1,6 @@
 package dev.jingtao.aicodebackend.langgraph4j.state;
 
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -34,5 +35,30 @@ public class WorkflowStreamConsumerRegistry {
             return;
         }
         consumerMap.remove(sessionId);
+    }
+
+    // ===== v2 事件消费者（AppGenerationMessage） =====
+
+    private final Map<String, Consumer<AppGenerationMessage>> eventConsumerMap = new ConcurrentHashMap<>();
+
+    public void registerEvent(String sessionId, Consumer<AppGenerationMessage> consumer) {
+        if (sessionId == null || sessionId.isBlank() || consumer == null) {
+            return;
+        }
+        eventConsumerMap.put(sessionId, consumer);
+    }
+
+    public Consumer<AppGenerationMessage> getEvent(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return null;
+        }
+        return eventConsumerMap.get(sessionId);
+    }
+
+    public void removeEvent(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        eventConsumerMap.remove(sessionId);
     }
 }

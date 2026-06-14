@@ -1,6 +1,7 @@
 package dev.jingtao.aicodebackend.langgraph4j;
 
 import cn.hutool.json.JSONUtil;
+import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.langgraph4j.model.QualityResult;
@@ -313,6 +314,43 @@ public class CodeGenWorkflow {
                     sink.error(e);
                 } finally {
                     workflowStreamConsumerRegistry.remove(streamSessionId);
+                }
+            });
+        });
+    }
+
+    /**
+     * 执行代码生成工作流（v2 事件流版本）。
+     * 通过 eventConsumer 把代码生成节点产出的 AppGenerationMessage 结构化事件实时转发出去；
+     * 工作流结束后为需要构建的 VUE 类型补发预览就绪事件（HTML/多文件的预览事件由 facade 内部发出）。
+     */
+    public Flux<AppGenerationMessage> executeWorkflowForUserChatEvent(String originalPrompt, Long appId, CodeGenTypeEnum codeGenTypeEnum){
+        return Flux.create(sink -> {
+            Thread.startVirtualThread(() -> {
+                String streamSessionId = UUID.randomUUID().toString();
+                try{
+                    var workflow = createWorkflow();
+                    Consumer<AppGenerationMessage> eventConsumer = sink::next;
+                    workflowStreamConsumerRegistry.registerEvent(streamSessionId, eventConsumer);
+                    var initContext = buildInitialContext(originalPrompt, appId, codeGenTypeEnum, null, streamSessionId);
+                    initContext.setEventConsumer(eventConsumer);
+
+                    for (NodeOutput<MessagesState<String>> step : workflow.stream(
+                            Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initContext))) {
+                        // 各节点的实时事件已通过 eventConsumer 转发，这里不额外输出工作流步骤
+                    }
+                    // VUE 经 ProjectBuilderNode 构建后补发预览就绪；HTML/多文件已由 facade 发出
+                    if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
+                        sink.next(AppGenerationMessage.previewReady(appId, "预览已更新"));
+                    }
+                    log.info("为客户聊天定制的代码生成工作流(Event)执行完成！");
+                    sink.complete();
+                } catch (Exception e) {
+                    log.error("为客户聊天定制的代码生成工作流(Event)执行失败: {}", e.getMessage(), e);
+                    sink.next(AppGenerationMessage.error(appId, "工作流执行失败：" + e.getMessage()));
+                    sink.complete();
+                } finally {
+                    workflowStreamConsumerRegistry.removeEvent(streamSessionId);
                 }
             });
         });

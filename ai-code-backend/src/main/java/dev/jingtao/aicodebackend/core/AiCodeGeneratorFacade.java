@@ -10,7 +10,6 @@ import dev.jingtao.aicodebackend.constant.AppConstant;
 import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
 import dev.jingtao.aicodebackend.core.parser.CodeParserExecutor;
 import dev.jingtao.aicodebackend.core.parser.FileBlockStreamParser;
-import dev.jingtao.aicodebackend.core.saver.CodeFileSaverExecutor;
 import dev.jingtao.aicodebackend.exception.BusinessException;
 import dev.jingtao.aicodebackend.exception.ErrorCode;
 import dev.jingtao.aicodebackend.exception.ThrowUtils;
@@ -90,19 +89,32 @@ public class AiCodeGeneratorFacade {
         return codeStream
                 //实时收集代码片段
                 .doOnNext(codeBuilder::append)
-                //流式返回完成后保存代码
+                //流式返回完成后统一通过 AppFileService 落盘（与 v2 一致，正确处理 file: 代码块）
                 .doOnComplete(() -> {
                     try{
-                        String completedCode = codeBuilder.toString();
-                        //使用执行器解析代码
-                        Object parsedResult = CodeParserExecutor.executeParser(completedCode,codeGenType);
-                        //使用执行器保存代码
-                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedResult,codeGenType, appId);
-                        log.info("{} mode files saved successfully: {}", codeGenType, savedDir.getAbsolutePath());
+                        persistCodeToFiles(codeBuilder.toString(), codeGenType, appId);
+                        log.info("{} mode files saved successfully, appId={}", codeGenType, appId);
                     } catch (Exception e) {
                         log.error("{} mode file saved failed, error: {}", codeGenType, e.getMessage(),e);
                     }
                 });
+    }
+
+    /**
+     * 将完整代码解析为 file:path 代码块并通过 AppFileService 落盘；没有 file 代码块时回退到传统解析器。
+     * 供 v1 字符串流在完成时统一落盘，与 v2 事件流保持一致的持久化逻辑。
+     */
+    private void persistCodeToFiles(String completedCode, CodeGenTypeEnum codeGenType, Long appId) {
+        FileBlockStreamParser parser = new FileBlockStreamParser(appId);
+        java.util.Map<String, String> pendingFileContent = new java.util.HashMap<>();
+        AtomicInteger savedFileCount = new AtomicInteger(0);
+        List<AppGenerationMessage> events = new ArrayList<>(parser.accept(completedCode));
+        events.addAll(parser.complete());
+        persistFileEvents(events, codeGenType, pendingFileContent, savedFileCount);
+        if (savedFileCount.get() == 0) {
+            List<AppGenerationMessage> fallbackEvents = createFallbackFileEvents(completedCode, codeGenType, appId);
+            persistFileEvents(fallbackEvents, codeGenType, pendingFileContent, savedFileCount);
+        }
     }
 
     /**
