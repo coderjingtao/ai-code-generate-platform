@@ -7,10 +7,10 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import dev.jingtao.aicodebackend.ai.AiCodeGenModeRoutingService;
 import dev.jingtao.aicodebackend.ai.AiCodeGenTypeRoutingService;
 import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
 import dev.jingtao.aicodebackend.constant.AppConstant;
-import dev.jingtao.aicodebackend.core.AiCodeGeneratorFacade;
 import dev.jingtao.aicodebackend.core.builder.VueProjectBuilder;
 import dev.jingtao.aicodebackend.core.engine.CodeGenEngine;
 import dev.jingtao.aicodebackend.core.handler.StreamHandlerExecutor;
@@ -58,8 +58,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private UsersService usersService;
     @Resource
-    private AiCodeGeneratorFacade aiCodeGeneratorFacade;
-    @Resource
     private ChatHistoryService chatHistoryService;
     @Resource
     private StreamHandlerExecutor streamHandlerExecutor;
@@ -69,6 +67,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ScreenshotService screenshotService;
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    @Resource
+    private AiCodeGenModeRoutingService aiCodeGenModeRoutingService;
     @Resource
     private List<CodeGenEngine> codeGenEngineList;
 
@@ -115,7 +115,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
-    public Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String mode) {
+    public Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser) {
         // 1.参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
@@ -129,7 +129,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的代码生成类型："+ codeGenType);
 
-        CodeGenModeEnum codeGenMode = CodeGenModeEnum.getEnumByValue(mode);
+        // 未显式指定模式时，按应用的初始提示词自动判断（classic / workflow）
+        CodeGenModeEnum codeGenMode = resolveCodeGenMode(app);
         CodeGenEngine codeGenEngine = getCodeGenEngine(codeGenMode);
         // 5.添加[用户消息]到对话历史
         chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
@@ -169,6 +170,21 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             }
             default -> {
             }
+        }
+    }
+
+    /**
+     * 解析代码生成模式：前端显式指定则用指定值；否则按应用的初始提示词用 AI 自动判断，失败兜底为 classic。
+     */
+    private CodeGenModeEnum resolveCodeGenMode(App app) {
+        try {
+            String routingPrompt = StrUtil.blankToDefault(app.getInitPrompt(), app.getAppName());
+            CodeGenModeEnum routed = aiCodeGenModeRoutingService.routeCodeGenMode(routingPrompt);
+            log.info("自动路由代码生成模式：appId={}, mode={}", app.getId(), routed == null ? "null" : routed.getValue());
+            return routed != null ? routed : CodeGenModeEnum.CLASSIC;
+        } catch (Exception e) {
+            log.warn("代码生成模式自动路由失败，降级为 classic，appId={}, error={}", app.getId(), e.getMessage());
+            return CodeGenModeEnum.CLASSIC;
         }
     }
 

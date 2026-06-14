@@ -31,7 +31,7 @@ public interface AppService extends IService<App> {
      * @return AI返回的流式字符串
      */
     Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode);
-    Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String mode);
+    Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser);
     /**
      * 创建应用
      *
