@@ -7,6 +7,7 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import dev.jingtao.aicodebackend.ai.AiAppNameGeneratorService;
 import dev.jingtao.aicodebackend.ai.AiCodeGenModeRoutingService;
 import dev.jingtao.aicodebackend.ai.AiCodeGenTypeRoutingService;
 import dev.jingtao.aicodebackend.ai.model.message.AppGenerationMessage;
@@ -69,6 +70,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
     @Resource
     private AiCodeGenModeRoutingService aiCodeGenModeRoutingService;
+    @Resource
+    private AiAppNameGeneratorService aiAppNameGeneratorService;
     @Resource
     private List<CodeGenEngine> codeGenEngineList;
 
@@ -188,6 +191,32 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
     }
 
+    /**
+     * 用 AI 根据初始提示词生成一个短小贴切的应用名称（appName 列为 varchar(256)，但越短越好）。
+     * 名称长度主要由提示词控制（2~8 个汉字），这里仅做清洗与安全上限；为空或异常时降级为截取提示词兜底。
+     */
+    private String generateAppName(String initPrompt) {
+        // 仅作防异常超长的安全上限，正常短名不会触及
+        final int hardCap = 30;
+        String fallback = StrUtil.subPre(initPrompt, 16);
+        try {
+            String name = aiAppNameGeneratorService.generateAppName(initPrompt);
+            if (StrUtil.isBlank(name)) {
+                return fallback;
+            }
+            // 清洗：合并换行、去掉首尾的引号/书名号与空白，并限制长度
+            name = name.replaceAll("[\\r\\n]+", " ").trim();
+            name = name.replaceAll("^[\\s\"'`“”‘’《》【】「」]+|[\\s\"'`“”‘’《》【】「」]+$", "").trim();
+            if (StrUtil.isBlank(name)) {
+                return fallback;
+            }
+            return StrUtil.subPre(name, hardCap);
+        } catch (Exception e) {
+            log.warn("AI 生成应用名称失败，降级为截取提示词，error={}", e.getMessage());
+            return fallback;
+        }
+    }
+
     @Override
     public long createApp(AppAddRequest appAddRequest, Users loginUser) {
         // 参数校验
@@ -198,7 +227,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        // 使用 AI 智能选择App Name
+        app.setAppName(generateAppName(initPrompt));
         // 使用 AI 智能选择代码生成类型
         CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
         app.setCodeGenType(selectedCodeGenType.getValue());
