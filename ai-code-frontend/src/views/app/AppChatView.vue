@@ -984,7 +984,7 @@ onBeforeUnmount(() => {
             :key="item.id"
             :class="['chat-message', `chat-message--${item.role}`]"
           >
-            <a-avatar :src="getMessageAvatar(item.role)" class="chat-message__avatar">
+            <a-avatar :size="36" :src="getMessageAvatar(item.role)" class="chat-message__avatar">
               {{ getMessageAvatarFallback(item.role) }}
             </a-avatar>
             <div class="chat-message__bubble">
@@ -1005,7 +1005,11 @@ onBeforeUnmount(() => {
                 v-if="item.role === 'assistant' && item.streaming && item.statusText"
                 class="chat-message__status"
               >
-                <span class="chat-message__status-spinner"></span>
+                <div class="chat-message__status-ai-loader">
+                  <span class="ai-dot"></span>
+                  <span class="ai-dot"></span>
+                  <span class="ai-dot"></span>
+                </div>
                 <span class="chat-message__status-text">{{ item.statusText }}</span>
               </div>
               <span v-if="item.streaming" class="chat-message__cursor">|</span>
@@ -1242,7 +1246,7 @@ onBeforeUnmount(() => {
   gap: 16px;
   border: 1px solid var(--ac-border);
   border-radius: var(--ac-radius-lg);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--ac-surface-elevated);
   padding: 16px 18px;
   flex-shrink: 0;
 }
@@ -1335,37 +1339,35 @@ onBeforeUnmount(() => {
 }
 
 .chat-message {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.chat-message--assistant {
-  justify-content: flex-start;
-}
-
-.chat-message--user {
-  justify-content: flex-end;
+  position: relative;
+  padding-left: 46px;
+  padding-right: 46px;
+  min-height: 36px;
 }
 
 .chat-message__avatar {
+  position: absolute;
+  top: 2px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   flex-shrink: 0;
-  margin-top: 2px;
   background: linear-gradient(135deg, #22d3ee, #2563eb);
   font-weight: 600;
 }
 
 .chat-message--assistant .chat-message__avatar {
+  left: 0;
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: #fff;
 }
 
 .chat-message--user .chat-message__avatar {
-  order: 2;
+  right: 0;
 }
 
 .chat-message__bubble {
-  max-width: min(82%, 620px);
+  width: 100%;
   border-radius: 14px;
   padding: 11px 14px;
   line-height: 1.62;
@@ -1453,7 +1455,7 @@ onBeforeUnmount(() => {
 }
 
 .chat-message--assistant .chat-message__bubble {
-  background: #f2f8ff;
+  background: var(--ac-surface-muted);
   color: var(--ac-text);
 }
 
@@ -1472,30 +1474,51 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 13px;
-  color: var(--ac-info);
-  background: var(--ac-info-soft);
-  padding: 6px 12px;
-  border-radius: var(--ac-radius-sm);
-  border: 1px solid rgba(37, 99, 235, 0.1);
+  color: var(--ac-text-muted);
+  font-weight: 500;
   width: fit-content;
 }
 
-.chat-message__status-spinner {
-  display: inline-block;
-  width: 14px;
+.chat-message__status-ai-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 14px;
-  border: 2px solid rgba(30, 64, 175, 0.2);
-  border-top-color: var(--ac-info);
-  border-radius: 50%;
-  animation: status-spin 0.8s linear infinite;
-  flex-shrink: 0;
 }
 
-@keyframes status-spin {
-  to {
-    transform: rotate(360deg);
+.chat-message__status-ai-loader .ai-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: ai-pulse 1.4s ease-in-out infinite both;
+}
+
+.chat-message__status-ai-loader .ai-dot:nth-child(1) {
+  animation-delay: -0.32s;
+  background-color: var(--ac-primary);
+}
+
+.chat-message__status-ai-loader .ai-dot:nth-child(2) {
+  animation-delay: -0.16s;
+  background-color: var(--ac-gold);
+}
+
+.chat-message__status-ai-loader .ai-dot:nth-child(3) {
+  background-color: var(--ac-accent);
+}
+
+@keyframes ai-pulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+    filter: drop-shadow(0 0 4px currentColor);
   }
 }
 
@@ -1711,7 +1734,7 @@ onBeforeUnmount(() => {
 /* --- Segmented Tab Control Styles --- */
 .workspace-tabs {
   display: inline-flex;
-  background: #f1f5f9;
+  background: var(--ac-surface-muted);
   padding: 3px;
   border-radius: 9px;
   user-select: none;
@@ -1722,7 +1745,7 @@ onBeforeUnmount(() => {
   padding: 6px 16px;
   font-size: 13px;
   font-weight: 500;
-  color: #475569;
+  color: var(--ac-text-muted);
   border-radius: var(--ac-radius-sm);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1730,7 +1753,8 @@ onBeforeUnmount(() => {
 
 .workspace-tab-item.active {
   background: var(--ac-surface);
-  color: var(--ac-text);
+  color: var(--ac-primary);
+  font-weight: 600;
   box-shadow: var(--ac-shadow-sm);
 }
 

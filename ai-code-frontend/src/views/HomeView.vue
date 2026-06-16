@@ -23,14 +23,38 @@ const loginUserStore = useLoginUserStore()
 const createPrompt = ref('')
 const creating = ref(false)
 const mySectionRef = ref<HTMLElement>()
+const composerRef = ref<HTMLElement>()
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser?.id))
 
 const inspirationPrompts = [
-  '做一个电商落地页，主色青蓝，突出限时折扣',
-  '做一个企业官网首页，包含产品介绍和联系我们',
-  '做一个活动报名页，支持流程介绍和报名入口',
-  '做一个个人作品集，强调项目案例和联系方式',
+  '做一个咖啡品牌官网，像独立杂志一样温暖高级',
+  '做一个 AI 产品发布页，黑色科技感，首屏有强 CTA',
+  '做一个音乐节活动页，明亮、大胆、适合移动端传播',
+  '做一个个人作品集，像策展空间，突出项目和联系入口',
+]
+
+const styleSignals = ['品牌气质', '页面结构', '交互动效', '发布代码']
+
+const workflowSteps = [
+  {
+    title: '写下想法',
+    text: '用一句话说明行业、氛围、功能和你想打动的人。',
+  },
+  {
+    title: '生成风格',
+    text: 'AI 会把抽象想法转成页面结构、视觉语言和可继续对话的方案。',
+  },
+  {
+    title: '继续打磨',
+    text: '像和设计师协作一样，调整色彩、文案、布局和交互细节。',
+  },
+]
+
+const showcaseNotes = [
+  '从“做个活动页”到完整报名体验',
+  '从“高级一点”到统一的品牌视觉',
+  '从“我有个 idea”到可预览的网站',
 ]
 
 const myState = reactive<AppListState>({
@@ -229,6 +253,11 @@ const scrollToMySection = async () => {
   mySectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+const scrollToComposer = async () => {
+  await nextTick()
+  composerRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 watch(isLoggedIn, (loggedIn) => {
   if (loggedIn) {
     void loadMyApps()
@@ -258,56 +287,78 @@ onMounted(() => {
 <template>
   <section class="home-page">
     <section class="hero">
-      <div class="hero__glow hero__glow--left" />
-      <div class="hero__glow hero__glow--right" />
+      <div class="hero__grain" />
+      <div class="hero__inner">
+        <div class="hero__content">
+          <p class="hero__eyebrow">NoCode AI Website Studio</p>
+          <h1 class="hero__title">一句话，呈所想。</h1>
+          <p class="hero__subtitle">
+            把脑海里的 idea 写下来，让NoCode 把它快速变为现实。
+          </p>
 
-      <div class="hero__content">
-        <h1 class="hero__title">
-          一句话
-          <span class="hero__title-mark">呈所想</span>
-        </h1>
-        <p class="hero__subtitle">与 AI 对话，快速创建你的网站应用</p>
+          <div ref="composerRef" class="composer">
+            <a-textarea
+              v-model:value="createPrompt"
+              :auto-size="{ minRows: 4, maxRows: 7 }"
+              placeholder="例如：做一个咖啡品牌官网，像独立杂志一样温暖高级，首屏有预约按钮..."
+              class="composer__textarea"
+            />
 
-        <div class="composer">
-          <a-textarea
-            v-model:value="createPrompt"
-            :auto-size="{ minRows: 4, maxRows: 7 }"
-            placeholder="使用 NoCode 创建一个有趣的小游戏，玩法是..."
-            class="composer__textarea"
-          />
+            <div class="composer__footer">
+              <div class="composer__signals">
+                <span v-for="item in styleSignals" :key="item">{{ item }}</span>
+              </div>
+              <a-button
+                type="primary"
+                shape="round"
+                size="large"
+                :loading="creating"
+                class="composer__button"
+                @click="handleCreateApp"
+              >
+                开始创建
+              </a-button>
+            </div>
+          </div>
 
-          <div class="composer__footer">
-            <span class="composer__hint">支持自然语言描述你的产品目标、页面风格和功能需求</span>
-            <a-button
-              type="primary"
-              shape="round"
-              size="large"
-              :loading="creating"
-              @click="handleCreateApp"
+          <div class="hero__suggestions">
+            <button
+              v-for="item in inspirationPrompts"
+              :key="item"
+              type="button"
+              class="hero__chip"
+              @click="usePromptTemplate(item)"
             >
-              开始生成
-            </a-button>
+              {{ item }}
+            </button>
           </div>
         </div>
 
-        <div class="hero__suggestions">
-          <button
-            v-for="item in inspirationPrompts"
-            :key="item"
-            type="button"
-            class="hero__chip"
-            @click="usePromptTemplate(item)"
-          >
-            {{ item }}
-          </button>
+        <div class="hero__visual" aria-hidden="true">
+          <div class="hero__canvas">
+            <div class="hero__browser-bar">
+              <span />
+              <span />
+              <span />
+            </div>
+            <div class="hero__screenshot-container">
+              <img src="@/assets/website_showcase.png" class="hero__screenshot" alt="Website Showcase" />
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="home-page__content">
+
+      
+
       <section v-if="isLoggedIn" ref="mySectionRef" class="app-section">
         <div class="app-section__header">
-          <h2>我的作品</h2>
+          <div>
+            <span class="section-kicker">Your studio</span>
+            <h2>我的作品</h2>
+          </div>
           <div class="app-section__query">
             <a-input
               v-model:value="myState.keyword"
@@ -349,17 +400,9 @@ onMounted(() => {
 
       <section class="app-section">
         <div class="app-section__header">
-          <h2>精选案例</h2>
-          <div class="app-section__query">
-            <a-input
-              v-model:value="goodState.keyword"
-              allow-clear
-              placeholder="按应用名称搜索"
-              class="app-section__search"
-              @pressEnter="handleGoodSearch"
-            />
-            <a-button type="primary" @click="handleGoodSearch">查询</a-button>
-            <a-button @click="handleGoodReset">重置</a-button>
+          <div>
+            <span class="section-kicker">Gallery</span>
+            <h2>精选案例</h2>
           </div>
         </div>
 
@@ -375,285 +418,33 @@ onMounted(() => {
           </div>
           <a-empty v-else description="暂无精选案例" />
         </a-spin>
+      </section>
 
-        <div class="app-section__pagination">
-          <a-pagination
-            :current="goodState.pageNum"
-            :page-size="goodState.pageSize"
-            :total="goodState.total"
-            :show-size-changer="true"
-            :show-total="(count: number) => `共 ${count} 条`"
-            :page-size-options="['8', '12', '16', '20']"
-            @change="onGoodPageChange"
-          />
+      
+      <section class="manifest-section">
+        <div class="manifest-section__copy">
+          <span class="section-kicker">Why it works</span>
+          <h2>不是模板库，是你的创意现场。</h2>
         </div>
+        <div class="manifest-section__notes">
+          <p v-for="item in showcaseNotes" :key="item">{{ item }}</p>
+        </div>
+      </section>
+<section class="workflow-section">
+        <div v-for="(item, index) in workflowSteps" :key="item.title" class="workflow-step">
+          <span>{{ String(index + 1).padStart(2, '0') }}</span>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.text }}</p>
+        </div>
+      </section>
+
+      <section class="final-cta">
+        <span class="section-kicker">Start now</span>
+        <h2>把那个还没命名的想法，先写成第一句话。</h2>
+        <a-button type="primary" shape="round" size="large" @click="scrollToComposer">
+          回到输入框
+        </a-button>
       </section>
     </section>
   </section>
 </template>
-
-<style scoped>
-.home-page {
-  min-height: 100%;
-  background: linear-gradient(164deg, #f7fbff 0%, #d6f4ff 42%, #b5dbff 100%);
-}
-
-.hero {
-  position: relative;
-  overflow: hidden;
-  padding: 84px 24px 130px;
-}
-
-.hero__content {
-  position: relative;
-  z-index: 2;
-  width: min(980px, 100%);
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  animation: fade-up 0.7s ease;
-}
-
-.hero__title {
-  margin: 0;
-  font-size: clamp(40px, 5.2vw, 74px);
-  line-height: 1.08;
-  letter-spacing: 1px;
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.hero__title-mark {
-  color: #0b4abf;
-}
-
-.hero__subtitle {
-  margin: 14px 0 0;
-  color: rgba(15, 23, 42, 0.66);
-  font-size: 19px;
-}
-
-.composer {
-  width: min(860px, 100%);
-  margin-top: 40px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 30px 60px rgba(14, 116, 144, 0.12);
-  padding: 18px 18px 14px;
-}
-
-.composer__textarea :deep(textarea) {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 20px;
-  line-height: 1.58;
-  color: #0f172a;
-  padding: 8px;
-}
-
-.composer__textarea :deep(textarea::placeholder) {
-  color: rgba(15, 23, 42, 0.3);
-}
-
-.composer__footer {
-  margin-top: 12px;
-  padding: 4px 8px 2px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.composer__hint {
-  color: rgba(15, 23, 42, 0.52);
-  font-size: 13px;
-}
-
-.hero__suggestions {
-  margin-top: 20px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.hero__chip {
-  border: 0;
-  border-radius: 999px;
-  padding: 10px 16px;
-  font-size: 13px;
-  cursor: pointer;
-  color: rgba(15, 23, 42, 0.72);
-  background: rgba(255, 255, 255, 0.74);
-  transition: all 0.22s ease;
-}
-
-.hero__chip:hover {
-  transform: translateY(-2px);
-  background: #fff;
-  color: #0f172a;
-}
-
-.hero__glow {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(4px);
-}
-
-.hero__glow--left {
-  width: 460px;
-  height: 460px;
-  left: -130px;
-  top: 54px;
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.3) 0%, rgba(34, 211, 238, 0) 72%);
-}
-
-.hero__glow--right {
-  width: 540px;
-  height: 540px;
-  right: -170px;
-  bottom: -120px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.38) 0%, rgba(59, 130, 246, 0) 74%);
-}
-
-.home-page__content {
-  position: relative;
-  background: #f8fbff;
-  border-radius: 34px 34px 0 0;
-  margin-top: -56px;
-  padding: 42px 24px 52px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.app-section {
-  width: min(1240px, 100%);
-  margin: 0 auto;
-  padding: 26px;
-  border-radius: 24px;
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  animation: fade-up 0.55s ease;
-}
-
-.app-section__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.app-section__header h2 {
-  margin: 0;
-  font-size: 28px;
-  color: #0f172a;
-  letter-spacing: 0.3px;
-}
-
-.app-section__query {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.app-section__search {
-  width: 230px;
-}
-
-.app-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.app-section__pagination {
-  margin-top: 22px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-@keyframes fade-up {
-  from {
-    transform: translateY(16px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@media (max-width: 1320px) {
-  .app-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 960px) {
-  .hero {
-    padding: 58px 16px 104px;
-  }
-
-  .hero__subtitle {
-    font-size: 16px;
-  }
-
-  .composer {
-    border-radius: 22px;
-    padding: 14px;
-  }
-
-  .composer__textarea :deep(textarea) {
-    font-size: 16px;
-    line-height: 1.56;
-  }
-
-  .composer__footer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .home-page__content {
-    margin-top: -44px;
-    border-radius: 22px 22px 0 0;
-    padding: 24px 12px 30px;
-  }
-
-  .app-section {
-    padding: 16px;
-    border-radius: 18px;
-  }
-
-  .app-section__header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-section__header h2 {
-    font-size: 22px;
-  }
-
-  .app-section__query {
-    justify-content: flex-start;
-  }
-
-  .app-section__search {
-    width: 100%;
-  }
-
-  .app-grid {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-  }
-
-  .app-section__pagination {
-    justify-content: center;
-  }
-}
-</style>

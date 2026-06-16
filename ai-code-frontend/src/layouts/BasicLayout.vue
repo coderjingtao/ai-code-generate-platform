@@ -10,14 +10,16 @@ const route = useRoute()
 
 const isChatPage = computed(() => route.path.startsWith('/app/chat'))
 const flushLayout = computed(() => route.path === '/' || route.path.startsWith('/app/chat'))
-const showFooter = computed(() => !route.path.startsWith('/app/chat'))
+const showFooter = computed(() => route.path !== '/' && !route.path.startsWith('/app/chat'))
 </script>
 
 <template>
   <a-layout class="basic-layout">
     <GlobalHeader :menu-items="globalMenuItems" />
 
-    <a-layout-content :class="['basic-layout__content', { 'basic-layout__content--chat': isChatPage }]">
+    <a-layout-content
+      :class="['basic-layout__content', { 'basic-layout__content--chat': isChatPage }]"
+    >
       <main
         :class="[
           'basic-layout__content-inner',
@@ -48,12 +50,12 @@ const showFooter = computed(() => !route.path.startsWith('/app/chat'))
 
 :global(body) {
   overflow: hidden;
-  background: #f5f7fb;
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--ac-bg-page);
+  font-family: var(--ac-font-sans);
 }
 
 .basic-layout {
-  --global-header-height: 72px;
+  --global-header-height: var(--ac-header-height);
   height: 100vh;
   display: flex;
   flex-direction: column;

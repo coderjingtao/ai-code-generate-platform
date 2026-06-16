@@ -61,18 +61,18 @@ const renderedMarkdown = computed(() => {
   margin: 1.25em 0 0.5em 0;
   font-weight: 600;
   line-height: 1.25;
-  color: #f8fafc;
+  color: var(--ac-text);
 }
 
 .markdown-content :deep(h1) {
   font-size: 1.4em;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--ac-border);
   padding-bottom: 0.3em;
 }
 
 .markdown-content :deep(h2) {
   font-size: 1.2em;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--ac-border);
   padding-bottom: 0.3em;
 }
 
@@ -97,15 +97,15 @@ const renderedMarkdown = computed(() => {
 .markdown-content :deep(blockquote) {
   margin: 1em 0;
   padding: 0.5em 1em;
-  border-left: 4px solid #3b82f6;
-  background-color: #1e293b;
-  color: #cbd5e1;
+  border-left: 4px solid var(--ac-primary);
+  background-color: var(--ac-surface-muted);
+  color: var(--ac-text-muted);
   border-radius: 0 4px 4px 0;
 }
 
 .markdown-content :deep(code) {
-  background-color: #1e293b;
-  color: #f1f5f9;
+  background-color: rgba(23, 24, 29, 0.06);
+  color: var(--ac-text);
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -113,8 +113,8 @@ const renderedMarkdown = computed(() => {
 }
 
 .markdown-content :deep(pre) {
-  background-color: #0f172a;
-  border: 1px solid #334155;
+  background-color: var(--ac-code-bg);
+  border: 1px solid var(--ac-code-header-border);
   border-radius: 6px;
   padding: 1em;
   overflow-x: auto;
@@ -138,19 +138,19 @@ const renderedMarkdown = computed(() => {
 
 .markdown-content :deep(table th),
 .markdown-content :deep(table td) {
-  border: 1px solid #334155;
+  border: 1px solid var(--ac-border);
   padding: 0.5em 0.8em;
   text-align: left;
 }
 
 .markdown-content :deep(table th) {
   background-color: #1e293b;
-  color: #f8fafc;
+  color: var(--ac-text);
   font-weight: 600;
 }
 
 .markdown-content :deep(table tr:nth-child(even)) {
-  background-color: #0f172a;
+  background-color: rgba(0, 0, 0, 0.02);
 }
 
 .markdown-content :deep(a) {
@@ -171,7 +171,7 @@ const renderedMarkdown = computed(() => {
 
 .markdown-content :deep(hr) {
   border: none;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--ac-border);
   margin: 1.5em 0;
 }
 

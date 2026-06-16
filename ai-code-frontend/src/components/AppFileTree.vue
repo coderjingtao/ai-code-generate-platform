@@ -139,10 +139,15 @@ const onSelect = (keys: (string | number)[], info: { node: { isLeaf?: boolean; k
   min-height: 0;
   overflow-y: auto;
   padding: 8px 4px;
+  background: transparent !important;
 }
 
-.app-file-tree__tree {
+.app-file-tree :deep(.ant-tree),
+.app-file-tree :deep(.ant-tree-list) {
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }
 
 .app-file-tree__tree :deep(.ant-tree-treenode) {
@@ -170,12 +175,12 @@ const onSelect = (keys: (string | number)[], info: { node: { isLeaf?: boolean; k
 }
 
 .app-file-tree__tree :deep(.ant-tree-node-content-wrapper:hover) {
-  background-color: #f1f5f9 !important;
+  background-color: var(--ac-primary-soft) !important;
 }
 
 .app-file-tree__tree :deep(.ant-tree-node-selected) {
-  background-color: #dbeafe !important;
-  color: #1d4ed8 !important;
+  background-color: var(--ac-primary-soft) !important;
+  color: var(--ac-primary-strong) !important;
   font-weight: 500 !important;
 }
 

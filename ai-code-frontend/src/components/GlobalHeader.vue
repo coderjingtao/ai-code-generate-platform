@@ -142,7 +142,7 @@ const goToRegisterPage = () => {
 <style scoped>
 .global-header {
   height: auto;
-  min-height: 72px;
+  min-height: var(--ac-header-height);
   line-height: normal;
   padding: 0 28px;
   position: sticky;
@@ -150,20 +150,20 @@ const goToRegisterPage = () => {
   z-index: 10;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid var(--ac-border);
 }
 
 .global-header--home {
-  background: #f7fbff;
+  background: rgba(16, 17, 20, 0.92);
   border-bottom: none;
-  backdrop-filter: none;
+  backdrop-filter: blur(18px);
 }
 
 .global-header__inner {
   display: flex;
   align-items: center;
   gap: 22px;
-  min-height: 72px;
+  min-height: var(--ac-header-height);
   width: 100%;
 }
 
@@ -185,10 +185,14 @@ const goToRegisterPage = () => {
 }
 
 .global-header__title {
-  color: #0f172a;
+  color: var(--ac-text);
   font-size: 32px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0;
+}
+
+.global-header--home .global-header__title {
+  color: var(--ac-text-inverse);
 }
 
 .global-header__menu-wrap {
@@ -201,12 +205,21 @@ const goToRegisterPage = () => {
   min-width: 0;
   border-bottom: none;
   background: transparent;
-  color: rgba(15, 23, 42, 0.68);
+  color: var(--ac-text-muted);
   font-weight: 500;
 }
 
 .global-header__menu-wrap :deep(.ant-menu-item-selected) {
-  color: #0f172a;
+  color: var(--ac-text);
+}
+
+.global-header--home .global-header__menu-wrap :deep(.ant-menu) {
+  color: var(--ac-text-inverse-muted);
+}
+
+.global-header--home .global-header__menu-wrap :deep(.ant-menu-item-selected),
+.global-header--home .global-header__menu-wrap :deep(.ant-menu-item:hover) {
+  color: var(--ac-text-inverse);
 }
 
 .global-header__menu-wrap :deep(.ant-menu-horizontal > .ant-menu-item::after),
@@ -218,21 +231,27 @@ const goToRegisterPage = () => {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 999px;
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius-pill);
   padding: 4px 12px 4px 4px;
-  background: #fff;
-  color: #0f172a;
+  background: var(--ac-surface);
+  color: var(--ac-text);
   cursor: pointer;
   min-width: max-content;
 }
 
 .global-header__user-trigger:hover {
-  border-color: rgba(34, 197, 94, 0.55);
+  border-color: var(--ac-primary-border);
+}
+
+.global-header--home .global-header__user-trigger {
+  border-color: var(--ac-border-inverse);
+  background: rgba(255, 248, 235, 0.1);
+  color: var(--ac-text-inverse);
 }
 
 .global-header__avatar {
-  background: linear-gradient(135deg, #22d3ee, #2563eb);
+  background: var(--ac-brand-gradient);
   font-weight: 600;
 }
 
@@ -249,6 +268,10 @@ const goToRegisterPage = () => {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+}
+
+.global-header--home .global-header__auth-actions :deep(.ant-btn-text) {
+  color: var(--ac-text-inverse-muted);
 }
 
 @media (max-width: 900px) {
