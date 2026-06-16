@@ -303,40 +303,74 @@ public class AiCodeGeneratorFacade {
      * @return AppGenerationMessage 事件流
      */
     private Flux<AppGenerationMessage> processTokenStreamWithEvents(TokenStream tokenStream, Long appId, boolean skipBuild) {
-        return Flux.create(sink -> tokenStream
-                // AI普通文本分片
-                .onPartialResponse(partialResponse ->
-                        sink.next(AppGenerationMessage.assistantMessage(appId, partialResponse)))
-                // 工具即将执行：参数已完整，每个工具只触发一次（替代会按分片重复触发的 onPartialToolCall，避免刷屏）
-                .beforeToolExecution(beforeToolExecution ->
-                        sink.next(AppGenerationMessage.toolCall(appId, "正在执行工具：" + beforeToolExecution.request().name())))
-                // 工具执行完成
-                .onToolExecuted(toolExecution -> {
-                    String toolName = toolExecution.request().name();
-                    sink.next(AppGenerationMessage.toolCall(appId, "工具执行完成：" + toolName));
-                    emitToolFileEvents(appId,toolName,toolExecution.request().arguments(), sink::next);
-                })
-                .onCompleteResponse(response -> {
-                    try {
-                        if (!skipBuild) {
-                            // 执行同步构建 Vue 项目，确保预览时项目已就绪
-                            buildProject(appId, sink::next);
-                            sink.next(AppGenerationMessage.previewReady(appId, "预览已更新"));
-                            sink.complete();
+        return Flux.create(sink -> {
+            // 流式 writeFile 的增量输出由独立累加器封装（状态 + JSON 增量解析逻辑）
+            StreamingWriteFileAccumulator writeAccumulator = new StreamingWriteFileAccumulator(appId, sink::next);
+
+            tokenStream
+                    // AI普通文本分片
+                    .onPartialResponse(partialResponse ->
+                            sink.next(AppGenerationMessage.assistantMessage(appId, partialResponse)))
+                    // 工具调用参数分片：对 writeFile 实时解析并以增量 file_delta 流式输出文件内容，实现真正的边写边显
+                    .onPartialToolCall(writeAccumulator::onPartialToolCall)
+                    // 工具即将执行：单行状态提示（前端只展示最新一条，不入库）
+                    .beforeToolExecution(beforeToolExecution ->
+                            sink.next(AppGenerationMessage.toolCall(appId, "正在执行工具：" + beforeToolExecution.request().name())))
+                    // 工具执行完成：补齐文件完成 / 删除等事件
+                    .onToolExecuted(toolExecution -> {
+                        String toolName = toolExecution.request().name();
+                        String arguments = toolExecution.request().arguments();
+                        if ("writeFile".equals(toolName)) {
+                            String path = extractJsonField(arguments, "relativeFilePath");
+                            if (path != null) {
+                                // 若未走分片流式（部分模型不下发工具参数分片），则在此做一次完整兜底输出
+                                if (!writeAccumulator.wasStreamed(path)) {
+                                    String content = extractJsonField(arguments, "content");
+                                    sink.next(AppGenerationMessage.fileStart(appId, path));
+                                    sink.next(AppGenerationMessage.fileDelta(appId, path, content == null ? "" : content, true));
+                                }
+                                sink.next(AppGenerationMessage.fileDone(appId, path));
+                            }
                         } else {
-                            log.info("Mode : Workflow下跳过Vue 项目构建，由后续ProjectBuildNode统一执行，appId={}", appId);
+                            emitToolFileEvents(appId, toolName, arguments, sink::next);
+                        }
+                    })
+                    .onCompleteResponse(response -> {
+                        try {
+                            if (!skipBuild) {
+                                // 执行同步构建 Vue 项目，确保预览时项目已就绪
+                                buildProject(appId, sink::next);
+                                sink.next(AppGenerationMessage.previewReady(appId, "预览已更新"));
+                                sink.complete();
+                            } else {
+                                log.info("Mode : Workflow下跳过Vue 项目构建，由后续ProjectBuildNode统一执行，appId={}", appId);
+                                sink.complete();
+                            }
+                        } catch (Exception e) {
+                            sink.next(AppGenerationMessage.error(appId, "构建失败：" + e.getMessage()));
                             sink.complete();
                         }
-                    } catch (Exception e) {
-                        sink.next(AppGenerationMessage.error(appId, "构建失败：" + e.getMessage()));
+                    })
+                    .onError((Throwable error) -> {
+                        sink.next(AppGenerationMessage.error(appId, "AI 回复失败：" + error.getMessage()));
                         sink.complete();
-                    }
-                })
-                .onError((Throwable error) -> {
-                    sink.next(AppGenerationMessage.error(appId, "AI 回复失败：" + error.getMessage()));
-                    sink.complete();
-                })
-                .start());
+                    })
+                    .start();
+        });
+    }
+
+    /**
+     * 从完整 JSON 参数中提取字符串字段（用于工具执行完成后的兜底）。
+     */
+    private String extractJsonField(String json, String key) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return JSONUtil.parseObj(json).getStr(key);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

@@ -167,8 +167,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             return;
         }
         switch (event.getType()) {
+            // 仅持久化 AI 的实际文本回复（生成计划 / 说明）。
             case "assistant_message" -> aiResponseBuilder.append(event.getContent());
-            case "tool_call", "build_status", "preview_ready", "generation_error" -> {
+            // 工具调用 / 构建状态 / 预览就绪属于执行过程提示，用户不关心，不写入对话历史；
+            // 仅保留生成错误，便于用户回看失败原因。
+            case "generation_error" -> {
                 String message = StrUtil.blankToDefault(event.getMessage(), event.getContent());
                 if (StrUtil.isNotBlank(message)) {
                     aiResponseBuilder.append("\n\n").append(message).append("\n");

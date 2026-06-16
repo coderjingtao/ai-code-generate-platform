@@ -1,0 +1,63 @@
+/**
+ * 全局设计令牌（颜色、圆角、阴影）。
+ * 在 main.ts 中于 Ant Design 样式之后引入，供各组件通过 var(--ac-*) 复用，
+ * 避免散落在各组件里的硬编码颜色 / 圆角 / 阴影。
+ */
+:root {
+  /* 颜色 - 页面与表面 */
+  --ac-bg-page: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+  --ac-surface: #ffffff;
+  --ac-surface-muted: #f8fafc;
+  --ac-surface-mask: rgba(248, 251, 255, 0.55);
+
+  /* 颜色 - 边框与文字 */
+  --ac-border: rgba(15, 23, 42, 0.08);
+  --ac-border-strong: rgba(15, 23, 42, 0.12);
+  --ac-text: #0f172a;
+  --ac-text-muted: rgba(15, 23, 42, 0.56);
+  --ac-text-subtle: rgba(15, 23, 42, 0.45);
+
+  /* 颜色 - 主题色 */
+  --ac-primary: #2563eb;
+  --ac-primary-strong: #1668dc;
+  --ac-primary-soft: rgba(22, 119, 255, 0.1);
+  --ac-primary-border: rgba(22, 119, 255, 0.22);
+  --ac-brand-gradient: linear-gradient(135deg, #22d3ee, #2563eb);
+
+  /* 颜色 - 状态 */
+  --ac-info: #1e40af;
+  --ac-info-soft: rgba(37, 99, 235, 0.05);
+  --ac-success: #16a34a;
+  --ac-error: #dc2626;
+
+  /* 颜色 - IDE 深色代码区 */
+  --ac-code-bg: #1e1e1e;
+  --ac-code-header-bg: #252526;
+  --ac-code-header-border: #2d2d2d;
+  --ac-code-text: #d4d4d4;
+  --ac-code-gutter: #858585;
+  --ac-code-gutter-border: #3c3c3c;
+  --ac-code-path: #cccccc;
+
+  /* 颜色 - 文件树图标 */
+  --ac-icon-folder: #16a34a;
+  --ac-icon-html: #ea580c;
+  --ac-icon-pkg: #dc2626;
+  --ac-icon-vite: #c084fc;
+  --ac-icon-script: #22d3ee;
+  --ac-icon-style: #2563eb;
+  --ac-icon-config: #eab308;
+  --ac-icon-markdown: #38bdf8;
+  --ac-icon-image: #a855f7;
+  --ac-icon-default: #94a3b8;
+
+  /* 圆角 */
+  --ac-radius-sm: 6px;
+  --ac-radius-md: 10px;
+  --ac-radius-lg: 16px;
+  --ac-radius-pill: 999px;
+
+  /* 阴影 */
+  --ac-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --ac-shadow-card: 0 12px 30px rgba(15, 23, 42, 0.08);
+}

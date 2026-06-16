@@ -7,6 +7,8 @@ import { setupAuthCheck } from './authCheck'
 
 import Antd from 'ant-design-vue'
 
+import '@/assets/styles/theme.css'
+
 const app = createApp(App)
 const pinia = createPinia()
 
