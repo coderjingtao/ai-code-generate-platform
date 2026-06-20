@@ -42,9 +42,11 @@ public class StaticResourceController {
             String resourcePath = (String) request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
             resourcePath = resourcePath.substring(("/static/"+ deployKey).length());
             //如果是目录访问（不带斜杠）, 重定向到带斜杠的URL /api/static/abc123 -> /api/static/abc123/
+            //使用相对跳转（仅最后一段路径 + "/"），由浏览器按当前页面的协议/域名解析，
+            //避免反代后 request.getRequestURL() 拼出 http 绝对地址，导致 https 页面触发 Mixed Content 被拦截
             if(resourcePath.isEmpty()){
                 HttpHeaders httpHeaders = new HttpHeaders();
-                httpHeaders.add("Location", request.getRequestURL() + "/");
+                httpHeaders.add("Location", deployKey + "/");
                 return new ResponseEntity<>(httpHeaders, HttpStatus.MOVED_PERMANENTLY);
             }
             //如果直接访问的根路径，则自动加上index.html: /api/static/abc123/ -> /api/static/abc123/index.html

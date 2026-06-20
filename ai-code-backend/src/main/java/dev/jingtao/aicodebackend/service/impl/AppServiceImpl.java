@@ -38,6 +38,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -77,6 +78,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private AiAppNameGeneratorService aiAppNameGeneratorService;
     @Resource
     private List<CodeGenEngine> codeGenEngineList;
+    @Value("${code.deploy-host}")
+    private String codeDeployHost;
 
     private final Map<CodeGenModeEnum, CodeGenEngine> codeGenEngineMap = new EnumMap<>(CodeGenModeEnum.class);
 
@@ -303,7 +306,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         boolean result = this.updateById(updateApp);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR,"更新应用部署信息失败");
         // 构建应用访问 URL
-        String appDeployUrl = String.format("%s/%s",AppConstant.CODE_DEPLOY_HOST, deployKey);
+        String appDeployUrl = String.format("%s/%s",codeDeployHost, deployKey);
         // 异步上传应用封面，避免阻塞用户的部署
         generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
