@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 
 import AppCard from '@/components/AppCard.vue'
+import { DEPLOY_BASE_URL } from '@/config/env'
 import { addApp, listGoodAppByPage, listMyAppByPage } from '@/api/appController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 
@@ -93,7 +94,7 @@ const goToWork = (record: API.AppVO) => {
     message.info('该应用暂未部署作品')
     return
   }
-  window.open(`http://localhost:8080/${encodeURIComponent(deployKey)}`, '_blank')
+  window.open(`${DEPLOY_BASE_URL}/${encodeURIComponent(deployKey)}`, '_blank')
 }
 
 const goToLogin = () => {
