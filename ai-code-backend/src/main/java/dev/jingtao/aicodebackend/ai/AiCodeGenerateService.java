@@ -15,18 +15,28 @@ public interface AiCodeGenerateService {
     String generateCode(String userPrompt);
 
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    HtmlCodeResult generateHtmlCode(String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    HtmlCodeResult generateHtmlCode(@V("userPrompt") String userPrompt,
+                                    @V("languageRequirement") String languageRequirement);
 
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    MultiFileCodeResult generateMultiFileCode(String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    MultiFileCodeResult generateMultiFileCode(@V("userPrompt") String userPrompt,
+                                              @V("languageRequirement") String languageRequirement);
 
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    Flux<String> generateHtmlCodeStream(String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    Flux<String> generateHtmlCodeStream(@V("userPrompt") String userPrompt,
+                                        @V("languageRequirement") String languageRequirement);
 
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    Flux<String> generateMultiFileCodeStream(String userPrompt);
+    @UserMessage("{{userPrompt}}")
+    Flux<String> generateMultiFileCodeStream(@V("userPrompt") String userPrompt,
+                                             @V("languageRequirement") String languageRequirement);
 
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
     @UserMessage("{{userPrompt}}")
-    TokenStream generateVueProjectCodeStream(@MemoryId long appId, @V("userPrompt") String userPrompt);
+    TokenStream generateVueProjectCodeStream(@MemoryId long appId,
+                                             @V("userPrompt") String userPrompt,
+                                             @V("languageRequirement") String languageRequirement);
 }

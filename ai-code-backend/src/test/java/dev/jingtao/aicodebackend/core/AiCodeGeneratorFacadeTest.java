@@ -1,6 +1,7 @@
 package dev.jingtao.aicodebackend.core;
 
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generateAndSaveCodeStream(){
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE,112L);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个最简单的登录页", CodeGenTypeEnum.MULTI_FILE,112L,PromptLanguageUtils.requirement("ZH"));
         //阻塞等待所有数据收集完成
         List<String> result = codeStream.collectList().block();
         Assertions.assertNotNull(result);
@@ -28,7 +29,7 @@ class AiCodeGeneratorFacadeTest {
 
     @Test
     void generateVueProject(){
-        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个简单的TODO List任务记录网站，总代码量不要超过200行", CodeGenTypeEnum.VUE_PROJECT,112L);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream("做个简单的TODO List任务记录网站，总代码量不要超过200行", CodeGenTypeEnum.VUE_PROJECT,112L, PromptLanguageUtils.requirement("ZH"));
         //阻塞等待所有数据收集完成
         List<String> result = codeStream.collectList().block();
         Assertions.assertNotNull(result);

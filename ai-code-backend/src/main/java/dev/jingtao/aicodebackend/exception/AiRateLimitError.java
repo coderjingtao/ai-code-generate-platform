@@ -1,6 +1,7 @@
 package dev.jingtao.aicodebackend.exception;
 
 import cn.hutool.core.util.StrUtil;
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import lombok.Getter;
 
 import java.util.regex.Matcher;
@@ -23,22 +24,25 @@ public class AiRateLimitError {
 
     private final Long retryAfterSeconds;
 
-    private AiRateLimitError(Long retryAfterSeconds) {
+    private AiRateLimitError(Long retryAfterSeconds, String lang) {
         this.code = ErrorCode.AI_RATE_LIMIT_ERROR.getCode();
         this.errorType = "AI_RATE_LIMIT";
-        this.message = buildFriendlyMessage(retryAfterSeconds);
+        this.message = buildFriendlyMessage(retryAfterSeconds, lang);
         this.retryAfterSeconds = retryAfterSeconds;
     }
 
-    public static AiRateLimitError from(Throwable throwable) {
-        return new AiRateLimitError(parseRetryAfterSeconds(throwable));
+    public static AiRateLimitError from(Throwable throwable, String lang) {
+        return new AiRateLimitError(parseRetryAfterSeconds(throwable), lang);
     }
 
-    private static String buildFriendlyMessage(Long retryAfterSeconds) {
+    private static String buildFriendlyMessage(Long retryAfterSeconds, String lang) {
+        boolean zh = PromptLanguageUtils.ZH.equals(lang);
         if (retryAfterSeconds == null) {
-            return "当前 AI 服务请求过于频繁，请稍后再试";
+            return zh ? "当前 AI 服务请求过于频繁，请稍后再试"
+                    : "The AI service is being requested too frequently, please try again later";
         }
-        return "当前 AI 服务请求过于频繁，请约 " + retryAfterSeconds + " 秒后重试";
+        return zh ? "当前 AI 服务请求过于频繁，请约 " + retryAfterSeconds + " 秒后重试"
+                : "The AI service is being requested too frequently, please retry in about " + retryAfterSeconds + "s";
     }
 
     private static Long parseRetryAfterSeconds(Throwable throwable) {

@@ -1,5 +1,6 @@
 package dev.jingtao.aicodebackend.exception;
 
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import lombok.Getter;
 
 /**
@@ -18,14 +19,16 @@ public class AiServiceUnavailableError {
 
     private final Long retryAfterSeconds;
 
-    private AiServiceUnavailableError() {
+    private AiServiceUnavailableError(String lang) {
         this.code = ErrorCode.AI_SERVICE_UNAVAILABLE_ERROR.getCode();
         this.errorType = "AI_SERVICE_UNAVAILABLE";
-        this.message = "当前 AI 模型请求量较高，请稍后再试";
+        this.message = PromptLanguageUtils.ZH.equals(lang)
+                ? "当前 AI 模型请求量较高，请稍后再试"
+                : "The AI model is currently under high demand, please try again later";
         this.retryAfterSeconds = DEFAULT_RETRY_AFTER_SECONDS;
     }
 
-    public static AiServiceUnavailableError create() {
-        return new AiServiceUnavailableError();
+    public static AiServiceUnavailableError create(String lang) {
+        return new AiServiceUnavailableError(lang);
     }
 }

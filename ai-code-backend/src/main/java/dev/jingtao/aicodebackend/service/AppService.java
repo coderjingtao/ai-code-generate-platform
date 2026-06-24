@@ -28,10 +28,11 @@ public interface AppService extends IService<App> {
      * @param userPrompt   生成应用的用户提示词
      * @param loginUser 登录用户
      * @param mode 代码生成模式，支持 classic 和 workflow
+     * @param lang 输出语言（en / zh），用于让 AI 用对应语言回复并生成对应语言的网站
      * @return AI返回的流式字符串
      */
-    Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode);
-    Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser);
+    Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode, String lang);
+    Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String lang);
     /**
      * 创建应用
      *

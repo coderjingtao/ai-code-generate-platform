@@ -49,8 +49,8 @@ public class AiCodeGeneratorFacade {
      * @param codeGenTypeEnum 代码生成类型
      * @return 生成代码的实时流式字符串
      */
-    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId){
-        return generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId, false);
+    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, String languageRequirement){
+        return generateAndSaveCodeStream(userPrompt, codeGenTypeEnum, appId, false, languageRequirement);
     }
 
     /**
@@ -61,20 +61,20 @@ public class AiCodeGeneratorFacade {
      * @param skipBuild 是否跳过流式结束后的构建步骤
      * @return 生成代码的实时流式字符串
      */
-    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, boolean skipBuild){
+    public Flux<String> generateAndSaveCodeStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, boolean skipBuild, String languageRequirement){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         var aiService = aiCodeGenerateServiceFactory.getAiService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum){
             case HTML -> {
-                Flux<String> codeStream = aiService.generateHtmlCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateHtmlCodeStream(userPrompt, languageRequirement);
                 yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiService.generateMultiFileCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateMultiFileCodeStream(userPrompt, languageRequirement);
                 yield processCodeStream(codeStream, codeGenTypeEnum, appId);
             }
             case VUE_PROJECT -> {
-                TokenStream tokenStream = aiService.generateVueProjectCodeStream(appId, userPrompt);
+                TokenStream tokenStream = aiService.generateVueProjectCodeStream(appId, userPrompt, languageRequirement);
                 yield processTokenStream(tokenStream, appId, skipBuild);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);
@@ -206,20 +206,20 @@ public class AiCodeGeneratorFacade {
      * @param skipBuild 是否跳过流式结束后的构建步骤
      * @return 生成代码的实时流式字符串
      */
-    public Flux<AppGenerationMessage> generateAndSaveCodeEventStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, boolean skipBuild){
+    public Flux<AppGenerationMessage> generateAndSaveCodeEventStream(String userPrompt, CodeGenTypeEnum codeGenTypeEnum, Long appId, boolean skipBuild, String languageRequirement){
         ThrowUtils.throwIf(codeGenTypeEnum == null, new BusinessException(ErrorCode.SYSTEM_ERROR, "生成代码类型为空"));
         var aiService = aiCodeGenerateServiceFactory.getAiService(appId, codeGenTypeEnum);
         return switch (codeGenTypeEnum){
             case HTML -> {
-                Flux<String> codeStream = aiService.generateHtmlCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateHtmlCodeStream(userPrompt, languageRequirement);
                 yield processCodeStreamWithEvents(codeStream, codeGenTypeEnum, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiService.generateMultiFileCodeStream(userPrompt);
+                Flux<String> codeStream = aiService.generateMultiFileCodeStream(userPrompt, languageRequirement);
                 yield processCodeStreamWithEvents(codeStream, codeGenTypeEnum, appId);
             }
             case VUE_PROJECT -> {
-                TokenStream tokenStream = aiService.generateVueProjectCodeStream(appId, userPrompt);
+                TokenStream tokenStream = aiService.generateVueProjectCodeStream(appId, userPrompt, languageRequirement);
                 yield processTokenStreamWithEvents(tokenStream, appId, skipBuild);
             }
             default -> throw new IllegalArgumentException("Unsupported code generation type: " + codeGenTypeEnum);

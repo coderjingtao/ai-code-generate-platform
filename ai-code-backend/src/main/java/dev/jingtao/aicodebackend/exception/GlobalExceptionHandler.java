@@ -73,6 +73,8 @@ public class GlobalExceptionHandler {
      * @return true表示是SSE请求并已处理，false表示不是SSE请求
      */
     private boolean handleSseError(int errorCode, String errorMessage) {
+        // 按当前请求语言翻译错误信息（英文环境查表替换）
+        errorMessage = dev.jingtao.aicodebackend.utils.MessageTranslator.translate(errorMessage);
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
             return false;

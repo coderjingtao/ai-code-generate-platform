@@ -45,6 +45,11 @@ public class WorkflowContext implements Serializable {
     private String originalPrompt;
 
     /**
+     * 输出语言（en / zh），用于给代码生成注入语言指令
+     */
+    private String lang;
+
+    /**
      * 应用 ID
      */
     private Long appId;

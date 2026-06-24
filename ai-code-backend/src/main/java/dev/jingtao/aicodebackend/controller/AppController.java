@@ -20,6 +20,8 @@ import dev.jingtao.aicodebackend.ratelimiter.enums.RateLimitType;
 import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.ProjectDownloadService;
 import dev.jingtao.aicodebackend.service.UsersService;
+import dev.jingtao.aicodebackend.utils.MessageTranslator;
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import dev.langchain4j.exception.HttpException;
 import dev.langchain4j.exception.RateLimitException;
 import jakarta.annotation.Resource;
@@ -48,6 +50,37 @@ public class AppController {
 
     private static final int USER_MAX_PAGE_SIZE = 20;
 
+    /**
+     * 解析输出语言：优先查询参数 lang（SSE 的 EventSource 无法设置请求头），
+     * 回退到 Accept-Language 请求头，非中文一律回退英文。
+     */
+    private String resolveLang(String lang, HttpServletRequest request) {
+        if (StrUtil.isNotBlank(lang)) {
+            return PromptLanguageUtils.resolve(lang);
+        }
+        return PromptLanguageUtils.resolve(request.getHeader("Accept-Language"));
+    }
+
+    /**
+     * 翻译生成事件中由后端产生的状态/进度提示（工具执行、构建状态、预览就绪、生成错误）。
+     * 这些事件的 message / content 同为系统提示文本，可安全翻译；AI 文本回复与文件代码内容
+     * （assistant_message / file_*）不在此列，保持原样。
+     */
+    private AppGenerationMessage localizeEvent(AppGenerationMessage event, String lang) {
+        if (event == null || event.getType() == null) {
+            return event;
+        }
+        switch (event.getType()) {
+            case "tool_call", "build_status", "preview_ready", "generation_error" -> {
+                event.setMessage(MessageTranslator.translate(event.getMessage(), lang));
+                event.setContent(MessageTranslator.translate(event.getContent(), lang));
+            }
+            default -> {
+            }
+        }
+        return event;
+    }
+
     @Resource
     private AppService appService;
 
@@ -71,12 +104,15 @@ public class AppController {
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                       @RequestParam String userPrompt,
                                       @RequestParam(defaultValue = "classic") String mode,
+                                      @RequestParam(required = false) String lang,
                                       HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "Invalid app id");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt), ErrorCode.PARAMS_ERROR, "User prompt must not be empty");
         Users loginUser = usersService.getLoginUser(request);
+        // 解析输出语言：优先查询参数 lang（EventSource 无法带请求头），回退 Accept-Language
+        String resolvedLang = resolveLang(lang, request);
         // 调用AI服务生成流式代码
-        Flux<String> codeStream = appService.chatToGenCode(appId, userPrompt, loginUser, mode);
+        Flux<String> codeStream = appService.chatToGenCode(appId, userPrompt, loginUser, mode, resolvedLang);
         // 把流式代码封装成 ServerSentEvent 格式，解决前端空格丢失的问题
         return codeStream
                 .map(code -> {
@@ -97,7 +133,7 @@ public class AppController {
                 .onErrorResume(RateLimitException.class, e -> Mono.just(
                         ServerSentEvent.<String>builder()
                                 .event("error")
-                                .data(JSONUtil.toJsonStr(AiRateLimitError.from(e)))
+                                .data(JSONUtil.toJsonStr(AiRateLimitError.from(e, resolvedLang)))
                                 .build()
                 ))
                 .onErrorResume(HttpException.class, e -> {
@@ -107,7 +143,7 @@ public class AppController {
                     return Mono.just(
                             ServerSentEvent.<String>builder()
                                     .event("error")
-                                    .data(JSONUtil.toJsonStr(AiServiceUnavailableError.create()))
+                                    .data(JSONUtil.toJsonStr(AiServiceUnavailableError.create(resolvedLang)))
                                     .build()
                     );
                 });
@@ -117,17 +153,20 @@ public class AppController {
     @GetMapping(value = "/chat/gen/code/v2", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCodeV2(@RequestParam Long appId,
                                                        @RequestParam String userPrompt,
+                                                       @RequestParam(required = false) String lang,
                                                        HttpServletRequest request) {
         ThrowUtils.throwIf(appId == null || appId <=0, ErrorCode.PARAMS_ERROR, "Invalid app id");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt), ErrorCode.PARAMS_ERROR, "User prompt must not be empty");
         Users loginUser = usersService.getLoginUser(request);
+        // 解析输出语言：优先查询参数 lang（EventSource 无法带请求头），回退 Accept-Language
+        String resolvedLang = resolveLang(lang, request);
         // 调用AI服务生成流式代码
-        Flux<AppGenerationMessage> eventFlux = appService.chatToGenCodeV2(appId, userPrompt, loginUser);
+        Flux<AppGenerationMessage> eventFlux = appService.chatToGenCodeV2(appId, userPrompt, loginUser, resolvedLang);
         // 把流式代码封装成 ServerSentEvent 格式，解决前端空格丢失的问题
         return eventFlux
                 .map(event -> ServerSentEvent.<String>builder()
                         .event(event.getType())
-                        .data(JSONUtil.toJsonStr(event))
+                        .data(JSONUtil.toJsonStr(localizeEvent(event, resolvedLang)))
                         .build())
                 .concatWith(Mono.just(
                         ServerSentEvent.<String>builder()

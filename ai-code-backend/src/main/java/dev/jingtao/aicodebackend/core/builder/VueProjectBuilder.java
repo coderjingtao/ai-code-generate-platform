@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -38,6 +40,9 @@ public class VueProjectBuilder {
             log.error("项目目录不存在：{}", projectPath);
             return false;
         }
+        // AI 偶尔会把工程多套一层目录（如 vue_project_x/my-app/package.json），
+        // 这里先把嵌套的工程内容上移到根目录，保证后续 build 与预览路径一致
+        flattenNestedProject(projectDir);
         // 检查是否有package.json
         File packageJsonFile = new File(projectDir, "package.json");
         if(!packageJsonFile.exists()){
@@ -63,6 +68,53 @@ public class VueProjectBuilder {
         }
         log.info("Vue 项目构建成功，dist 目录：{}", distDir);
         return true;
+    }
+
+    /**
+     * 修正「多套一层目录」的情况：当根目录下没有 package.json，但恰好有一个子目录里含有
+     * package.json 时，把该子目录的全部内容上移到根目录，并删除空的子目录。
+     * 仅处理这一种明确场景，避免误判正常的多文件工程结构。
+     */
+    private void flattenNestedProject(File projectDir) {
+        File rootPackageJson = new File(projectDir, "package.json");
+        if (rootPackageJson.exists()) {
+            return;
+        }
+        File[] children = projectDir.listFiles();
+        if (children == null) {
+            return;
+        }
+        // 找出含有 package.json 的子目录
+        File nestedRoot = null;
+        for (File child : children) {
+            if (child.isDirectory() && new File(child, "package.json").exists()) {
+                if (nestedRoot != null) {
+                    // 存在多个候选，结构不明确，放弃自动修正
+                    log.warn("检测到多个嵌套工程目录，跳过自动展平：{}", projectDir.getAbsolutePath());
+                    return;
+                }
+                nestedRoot = child;
+            }
+        }
+        if (nestedRoot == null) {
+            return;
+        }
+        log.warn("检测到工程被多套了一层目录，自动上移：{} -> {}", nestedRoot.getName(), projectDir.getAbsolutePath());
+        File[] nestedEntries = nestedRoot.listFiles();
+        if (nestedEntries != null) {
+            for (File entry : nestedEntries) {
+                File target = new File(projectDir, entry.getName());
+                try {
+                    Files.move(entry.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception e) {
+                    log.error("上移嵌套工程文件失败：{}，错误：{}", entry.getName(), e.getMessage(), e);
+                }
+            }
+        }
+        // 删除已清空的嵌套目录（残留也不影响构建）
+        if (!nestedRoot.delete()) {
+            log.warn("嵌套目录上移后未能删除（不影响构建）：{}", nestedRoot.getAbsolutePath());
+        }
     }
 
     /**

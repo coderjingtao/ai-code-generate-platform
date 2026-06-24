@@ -34,6 +34,7 @@ import dev.jingtao.aicodebackend.service.AppService;
 import dev.jingtao.aicodebackend.service.ChatHistoryService;
 import dev.jingtao.aicodebackend.service.ScreenshotService;
 import dev.jingtao.aicodebackend.service.UsersService;
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -99,7 +100,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode) {
+    public Flux<String> chatToGenCode(Long appId, String userPrompt, Users loginUser, String mode, String lang) {
         // 1.参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
@@ -115,16 +116,17 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
         CodeGenModeEnum codeGenMode = CodeGenModeEnum.getEnumByValue(mode);
         CodeGenEngine codeGenEngine = getCodeGenEngine(codeGenMode);
-        // 5.添加[用户消息]到对话历史
+        // 5.添加[用户消息]到对话历史（保存用户原始提示词，不含语言指令）
         chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
-        // 6.根据选择的代码引擎来生成代码
-        Flux<String> codeStream = codeGenEngine.generate(appId, userPrompt, loginUser, codeGenTypeEnum);
+        // 6.根据选择的代码引擎来生成代码（语言指令在下游注入系统提示词）
+        String resolvedLang = PromptLanguageUtils.resolve(lang);
+        Flux<String> codeStream = codeGenEngine.generate(appId, userPrompt, loginUser, codeGenTypeEnum, resolvedLang);
         // 7.收集AI响应内容并在完成后添加到对话历史中
         return streamHandlerExecutor.doExecute(codeStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
     }
 
     @Override
-    public Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser) {
+    public Flux<AppGenerationMessage> chatToGenCodeV2(Long appId, String userPrompt, Users loginUser, String lang) {
         // 1.参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR,"应用ID错误");
         ThrowUtils.throwIf(StrUtil.isBlank(userPrompt),ErrorCode.PARAMS_ERROR,"用户提示词不能为空");
@@ -141,11 +143,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 未显式指定模式时，按应用的初始提示词自动判断（classic / workflow）
         CodeGenModeEnum codeGenMode = resolveCodeGenMode(app);
         CodeGenEngine codeGenEngine = getCodeGenEngine(codeGenMode);
-        // 5.添加[用户消息]到对话历史
+        // 5.添加[用户消息]到对话历史（保存用户原始提示词，不含语言指令）
         chatHistoryService.addChatHistory(appId, userPrompt, ChatHistoryMessageTypeEnum.USERS.getValue(), loginUser.getId());
-        // 6.根据选择的代码引擎来生成代码
+        // 6.根据选择的代码引擎来生成代码（语言指令在下游注入系统提示词）
+        String resolvedLang = PromptLanguageUtils.resolve(lang);
         StringBuilder aiResponseBuilder = new StringBuilder();
-        Flux<AppGenerationMessage> eventStream = codeGenEngine.generateEvent(appId, userPrompt, loginUser, codeGenTypeEnum);
+        Flux<AppGenerationMessage> eventStream = codeGenEngine.generateEvent(appId, userPrompt, loginUser, codeGenTypeEnum, resolvedLang);
         // 7.收集AI响应内容并在完成后添加到对话历史中
 //        return streamHandlerExecutor.doExecute(eventStream,chatHistoryService,appId,loginUser,codeGenTypeEnum);
 
@@ -204,12 +207,14 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
      * 用 AI 根据初始提示词生成一个短小贴切的应用名称（appName 列为 varchar(256)，但越短越好）。
      * 名称长度主要由提示词控制（2~8 个汉字），这里仅做清洗与安全上限；为空或异常时降级为截取提示词兜底。
      */
-    private String generateAppName(String initPrompt) {
+    private String generateAppName(String initPrompt, String lang) {
         // 仅作防异常超长的安全上限，正常短名不会触及
         final int hardCap = 30;
         String fallback = StrUtil.subPre(initPrompt, 16);
         try {
-            String name = aiAppNameGeneratorService.generateAppName(initPrompt);
+            // 追加语言指令，使生成的应用名与界面 / 网站语言一致
+            String promptForAi = PromptLanguageUtils.append(initPrompt, lang);
+            String name = aiAppNameGeneratorService.generateAppName(promptForAi);
             if (StrUtil.isBlank(name)) {
                 return fallback;
             }
@@ -236,10 +241,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
+        // 在请求线程上先取当前语言（虚拟线程不会继承 LocaleContextHolder，需提前捕获）
+        String lang = PromptLanguageUtils.current();
         // 并行执行两次 AI 调用（智能起名 + 代码类型路由），总耗时约为两者的较大值而非之和
         try (var aiExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
             var appNameFuture = CompletableFuture
-                    .supplyAsync(() -> generateAppName(initPrompt), aiExecutor);
+                    .supplyAsync(() -> generateAppName(initPrompt, lang), aiExecutor);
             var codeGenTypeFuture = CompletableFuture
                     .supplyAsync(() -> aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt), aiExecutor);
             app.setAppName(appNameFuture.join());

@@ -21,13 +21,13 @@ public class WorkflowCodeGenEngine implements CodeGenEngine{
     }
 
     @Override
-    public Flux<String> generate(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum) {
-        return codeGenWorkflow.executeWorkflowForUserChat(userPrompt,appId,codeGenTypeEnum);
+    public Flux<String> generate(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum, String lang) {
+        return codeGenWorkflow.executeWorkflowForUserChat(userPrompt, appId, codeGenTypeEnum, lang);
     }
 
     @Override
-    public Flux<AppGenerationMessage> generateEvent(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum) {
+    public Flux<AppGenerationMessage> generateEvent(Long appId, String userPrompt, Users loginUser, CodeGenTypeEnum codeGenTypeEnum, String lang) {
         // 工作流模式的 v2 事件流：由工作流在代码生成节点转发结构化事件，结束后补发预览就绪
-        return codeGenWorkflow.executeWorkflowForUserChatEvent(userPrompt, appId, codeGenTypeEnum);
+        return codeGenWorkflow.executeWorkflowForUserChatEvent(userPrompt, appId, codeGenTypeEnum, lang);
     }
 }

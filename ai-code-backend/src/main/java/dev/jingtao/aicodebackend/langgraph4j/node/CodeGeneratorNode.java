@@ -7,6 +7,7 @@ import dev.jingtao.aicodebackend.langgraph4j.model.QualityResult;
 import dev.jingtao.aicodebackend.langgraph4j.state.WorkflowContext;
 import dev.jingtao.aicodebackend.langgraph4j.state.WorkflowStreamConsumerRegistry;
 import dev.jingtao.aicodebackend.model.enums.CodeGenTypeEnum;
+import dev.jingtao.aicodebackend.utils.PromptLanguageUtils;
 import dev.jingtao.aicodebackend.utils.SpringContextUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.bsc.langgraph4j.action.AsyncNodeAction;
@@ -28,6 +29,8 @@ public class CodeGeneratorNode {
             // 使用增强提示词作为发给AI的用户消息
             String userMessage = buildUserMessage(context);
             CodeGenTypeEnum generationType = context.getGenerationType();
+            // 语言要求注入系统提示词（让 AI 用对应语言回复并生成对应语言网站）
+            String languageRequirement = PromptLanguageUtils.requirement(PromptLanguageUtils.resolve(context.getLang()));
 
             // 获取AI代码生成服务
             var codeGeneratorFacade = SpringContextUtil.getBean(AiCodeGeneratorFacade.class);
@@ -44,12 +47,12 @@ public class CodeGeneratorNode {
                 eventConsumer = consumerRegistry.getEvent(context.getStreamSessionId());
             }
             if(eventConsumer != null){
-                codeGeneratorFacade.generateAndSaveCodeEventStream(userMessage, generationType, appId, true)
+                codeGeneratorFacade.generateAndSaveCodeEventStream(userMessage, generationType, appId, true, languageRequirement)
                         .doOnNext(eventConsumer)
                         .blockLast(Duration.ofMinutes(10)); //最多等待10分钟
             } else {
                 // 调用streaming代码生成并指定跳过初始构建（工作流模式下，由后续构建节点统一执行）
-                Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId, true);
+                Flux<String> codeStream = codeGeneratorFacade.generateAndSaveCodeStream(userMessage, generationType, appId, true, languageRequirement);
                 Consumer<String> streamConsumer = context.getStreamConsumer();
                 if(streamConsumer == null && context.getStreamSessionId() != null){
                     var consumerRegistry = SpringContextUtil.getBean(WorkflowStreamConsumerRegistry.class);

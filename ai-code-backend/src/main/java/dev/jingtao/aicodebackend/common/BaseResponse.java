@@ -1,6 +1,7 @@
 package dev.jingtao.aicodebackend.common;
 
 import dev.jingtao.aicodebackend.exception.ErrorCode;
+import dev.jingtao.aicodebackend.utils.MessageTranslator;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -27,6 +28,6 @@ public class BaseResponse<T> implements Serializable {
     }
 
     public BaseResponse(ErrorCode errorCode) {
-        this(errorCode.getCode(), null, errorCode.getMessage());
+        this(errorCode.getCode(), null, MessageTranslator.translate(errorCode.getMessage()));
     }
 }

@@ -1,6 +1,7 @@
 package dev.jingtao.aicodebackend.common;
 
 import dev.jingtao.aicodebackend.exception.ErrorCode;
+import dev.jingtao.aicodebackend.utils.MessageTranslator;
 
 public final class ResultUtils {
 
@@ -33,7 +34,7 @@ public final class ResultUtils {
      * @return 响应
      */
     public static BaseResponse<?> error(int code, String message) {
-        return new BaseResponse<>(code, null, message);
+        return new BaseResponse<>(code, null, MessageTranslator.translate(message));
     }
 
     /**
@@ -43,7 +44,7 @@ public final class ResultUtils {
      * @return 响应
      */
     public static BaseResponse<?> error(ErrorCode errorCode, String message) {
-        return new BaseResponse<>(errorCode.getCode(), null, message);
+        return new BaseResponse<>(errorCode.getCode(), null, MessageTranslator.translate(message));
     }
 }
 

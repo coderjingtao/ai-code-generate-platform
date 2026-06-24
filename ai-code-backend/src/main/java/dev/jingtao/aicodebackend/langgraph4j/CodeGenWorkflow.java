@@ -282,7 +282,7 @@ public class CodeGenWorkflow {
      * 执行代码生成工作流 for 客户对话
      * 仅传递代码生成分片，不输出工作流等信息给客户
      */
-    public Flux<String> executeWorkflowForUserChat(String originalPrompt, Long appId, CodeGenTypeEnum codeGenTypeEnum){
+    public Flux<String> executeWorkflowForUserChat(String originalPrompt, Long appId, CodeGenTypeEnum codeGenTypeEnum, String lang){
         return Flux.create(sink -> {
             Thread.startVirtualThread(() -> {
                 String streamSessionId = UUID.randomUUID().toString();
@@ -302,6 +302,7 @@ public class CodeGenWorkflow {
                             chunkConsumer,
                             streamSessionId
                     );
+                    initContext.setLang(lang);
 
                     for (NodeOutput<MessagesState<String>> step : workflow.stream(
                             Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initContext))) {
@@ -324,7 +325,7 @@ public class CodeGenWorkflow {
      * 通过 eventConsumer 把代码生成节点产出的 AppGenerationMessage 结构化事件实时转发出去；
      * 工作流结束后为需要构建的 VUE 类型补发预览就绪事件（HTML/多文件的预览事件由 facade 内部发出）。
      */
-    public Flux<AppGenerationMessage> executeWorkflowForUserChatEvent(String originalPrompt, Long appId, CodeGenTypeEnum codeGenTypeEnum){
+    public Flux<AppGenerationMessage> executeWorkflowForUserChatEvent(String originalPrompt, Long appId, CodeGenTypeEnum codeGenTypeEnum, String lang){
         return Flux.create(sink -> {
             Thread.startVirtualThread(() -> {
                 String streamSessionId = UUID.randomUUID().toString();
@@ -333,6 +334,7 @@ public class CodeGenWorkflow {
                     Consumer<AppGenerationMessage> eventConsumer = sink::next;
                     workflowStreamConsumerRegistry.registerEvent(streamSessionId, eventConsumer);
                     var initContext = buildInitialContext(originalPrompt, appId, codeGenTypeEnum, null, streamSessionId);
+                    initContext.setLang(lang);
                     initContext.setEventConsumer(eventConsumer);
 
                     for (NodeOutput<MessagesState<String>> step : workflow.stream(
