@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 import { API_BASE_URL } from '@/config/env'
+import { currentLang } from '@/locales'
 
 const loginRequiredPathPrefixes = ['/app/chat', '/app/edit', '/admin', '/workspace', '/history']
 
@@ -18,7 +19,9 @@ const myAxios = axios.create({
 // 全局请求拦截器
 myAxios.interceptors.request.use(
   function (config) {
-    // Do something before request is sent
+    // 注入当前语言，后端据此返回对应语言的提示信息并生成对应语言的网站内容
+    config.headers = config.headers || {}
+    config.headers['Accept-Language'] = currentLang()
     return config
   },
   function (error) {

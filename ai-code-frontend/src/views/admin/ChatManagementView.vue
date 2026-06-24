@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
 import { listChatHistoryByPageForAdmin } from '@/api/chatHistoryController'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const loading = ref(false)
 const total = ref(0)
@@ -24,80 +26,80 @@ const searchParams = reactive<API.ChatHistoryQueryRequest>({
   sortOrder: 'descend',
 })
 
-const messageTypeOptions = [
-  { label: '用户', value: 'user' },
-  { label: 'AI', value: 'assistant' },
-  { label: '系统', value: 'system' },
-]
+const messageTypeOptions = computed(() => [
+  { label: t('adminChat.type.user'), value: 'user' },
+  { label: t('adminChat.type.assistant'), value: 'assistant' },
+  { label: t('adminChat.type.system'), value: 'system' },
+])
 
-const sortFieldOptions = [
-  { label: '记录 ID', value: 'id' },
-  { label: '应用 ID', value: 'appId' },
-  { label: '用户 ID', value: 'userId' },
-  { label: '创建时间', value: 'createTime' },
-  { label: '更新时间', value: 'updateTime' },
-]
+const sortFieldOptions = computed(() => [
+  { label: t('adminChat.sortField.id'), value: 'id' },
+  { label: t('adminChat.sortField.appId'), value: 'appId' },
+  { label: t('adminChat.sortField.userId'), value: 'userId' },
+  { label: t('adminChat.sortField.createTime'), value: 'createTime' },
+  { label: t('adminChat.sortField.updateTime'), value: 'updateTime' },
+])
 
-const sortOrderOptions = [
-  { label: '升序', value: 'ascend' },
-  { label: '降序', value: 'descend' },
-]
+const sortOrderOptions = computed(() => [
+  { label: t('adminChat.sortOrder.ascend'), value: 'ascend' },
+  { label: t('adminChat.sortOrder.descend'), value: 'descend' },
+])
 
-const columns: TableColumnsType<API.ChatHistory> = [
+const columns = computed<TableColumnsType<API.ChatHistory>>(() => [
   {
-    title: 'ID',
+    title: t('adminChat.columns.id'),
     dataIndex: 'id',
     width: 96,
     fixed: 'left',
   },
   {
-    title: '应用 ID',
+    title: t('adminChat.columns.appId'),
     dataIndex: 'appId',
     width: 110,
   },
   {
-    title: '用户 ID',
+    title: t('adminChat.columns.userId'),
     dataIndex: 'userId',
     width: 110,
   },
   {
-    title: '消息类型',
+    title: t('adminChat.columns.messageType'),
     dataIndex: 'messageType',
     width: 120,
   },
   {
-    title: '消息内容',
+    title: t('adminChat.columns.message'),
     dataIndex: 'message',
     width: 520,
   },
   {
-    title: '创建时间',
+    title: t('adminChat.columns.createTime'),
     dataIndex: 'createTime',
     width: 186,
   },
   {
-    title: '更新时间',
+    title: t('adminChat.columns.updateTime'),
     dataIndex: 'updateTime',
     width: 186,
   },
   {
-    title: '操作',
+    title: t('adminChat.columns.action'),
     key: 'action',
     fixed: 'right',
     width: 120,
   },
-]
+])
 
 const getMessageTypeMeta = (messageType?: string) => {
   const normalized = (messageType || '').trim().toLowerCase()
   if (['user', 'users', 'human', 'question', 'prompt'].includes(normalized)) {
-    return { label: '用户', color: 'blue' }
+    return { label: t('adminChat.type.user'), color: 'blue' }
   }
   if (['assistant', 'ai', 'bot', 'answer', 'reply'].includes(normalized)) {
-    return { label: 'AI', color: 'geekblue' }
+    return { label: t('adminChat.type.assistant'), color: 'geekblue' }
   }
   if (normalized === 'system') {
-    return { label: '系统', color: 'purple' }
+    return { label: t('adminChat.type.system'), color: 'purple' }
   }
   return { label: messageType || '-', color: 'default' }
 }
@@ -122,9 +124,9 @@ const loadData = async () => {
       return
     }
 
-    message.error(res.data.message || '获取对话记录失败')
+    message.error(res.data.message || t('adminChat.messages.loadFailed'))
   } catch {
-    message.error('获取对话记录失败，请稍后重试')
+    message.error(t('adminChat.messages.loadFailedRetry'))
   } finally {
     loading.value = false
   }
@@ -156,7 +158,7 @@ const onTableChange = (pagination: TablePaginationConfig) => {
 
 const openAppChat = (record: API.ChatHistory) => {
   if (!record.appId) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('adminChat.messages.appIdMissing'))
     return
   }
   void router.push({ path: `/app/chat/${record.appId}`, query: { admin: '1' } })
@@ -170,9 +172,9 @@ onMounted(() => {
 <template>
   <section class="chat-management">
     <a-card class="query-section" :bordered="false">
-      <h2 class="section-title">查询区</h2>
+      <h2 class="section-title">{{ $t('adminChat.title.query') }}</h2>
       <a-form layout="inline" class="query-form" :model="searchParams" @finish="doSearch">
-        <a-form-item label="应用 ID">
+        <a-form-item :label="$t('adminChat.search.appIdLabel')">
           <a-input
             v-model:value="searchParams.appId"
             allow-clear
@@ -181,7 +183,7 @@ onMounted(() => {
           />
         </a-form-item>
 
-        <a-form-item label="用户 ID">
+        <a-form-item :label="$t('adminChat.search.userIdLabel')">
           <a-input-number
             v-model:value="searchParams.userId"
             :min="1"
@@ -190,61 +192,61 @@ onMounted(() => {
           />
         </a-form-item>
 
-        <a-form-item label="消息类型">
+        <a-form-item :label="$t('adminChat.search.messageTypeLabel')">
           <a-select
             v-model:value="searchParams.messageType"
             allow-clear
             :options="messageTypeOptions"
-            placeholder="请选择消息类型"
+            :placeholder="$t('adminChat.search.messageTypePlaceholder')"
             style="width: 180px"
           />
         </a-form-item>
 
-        <a-form-item label="消息内容">
+        <a-form-item :label="$t('adminChat.search.messageLabel')">
           <a-input
             v-model:value="searchParams.message"
             allow-clear
-            placeholder="按消息内容搜索"
+            :placeholder="$t('adminChat.search.messagePlaceholder')"
             style="width: 260px"
           />
         </a-form-item>
 
-        <a-form-item label="游标时间">
+        <a-form-item :label="$t('adminChat.search.cursorTimeLabel')">
           <a-date-picker
             v-model:value="searchParams.lastCreateTime"
             allow-clear
             show-time
             value-format="YYYY-MM-DD HH:mm:ss"
             format="YYYY-MM-DD HH:mm:ss"
-            placeholder="请选择游标时间"
+            :placeholder="$t('adminChat.search.cursorTimePlaceholder')"
             style="width: 220px"
           />
         </a-form-item>
 
-        <a-form-item label="排序字段">
+        <a-form-item :label="$t('adminChat.search.sortFieldLabel')">
           <a-select
             v-model:value="searchParams.sortField"
             allow-clear
             style="width: 140px"
             :options="sortFieldOptions"
-            placeholder="字段"
+            :placeholder="$t('adminChat.search.sortFieldPlaceholder')"
           />
         </a-form-item>
 
-        <a-form-item label="排序方式">
+        <a-form-item :label="$t('adminChat.search.sortOrderLabel')">
           <a-select
             v-model:value="searchParams.sortOrder"
             allow-clear
             style="width: 120px"
             :options="sortOrderOptions"
-            placeholder="方式"
+            :placeholder="$t('adminChat.search.sortOrderPlaceholder')"
           />
         </a-form-item>
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" html-type="submit">查询</a-button>
-            <a-button @click="doReset">重置</a-button>
+            <a-button type="primary" html-type="submit">{{ $t('common.actions.search') }}</a-button>
+            <a-button @click="doReset">{{ $t('common.actions.reset') }}</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -252,7 +254,7 @@ onMounted(() => {
 
     <a-card class="table-section" :bordered="false">
       <div class="section-header">
-        <h2 class="section-title">对话记录列表</h2>
+        <h2 class="section-title">{{ $t('adminChat.title.list') }}</h2>
       </div>
 
       <a-table
@@ -265,7 +267,7 @@ onMounted(() => {
           pageSize: searchParams.pageSize,
           total,
           showSizeChanger: true,
-          showTotal: (count: number) => `共 ${count} 条`,
+          showTotal: (count: number) => t('adminChat.messages.total', { count }),
           pageSizeOptions: ['20', '50', '100', '200'],
         }"
         :scroll="{ x: 1600 }"
@@ -285,7 +287,7 @@ onMounted(() => {
           </template>
 
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" @click="openAppChat(record)">查看应用</a-button>
+            <a-button type="link" @click="openAppChat(record)">{{ $t('adminChat.buttons.viewApp') }}</a-button>
           </template>
         </template>
       </a-table>

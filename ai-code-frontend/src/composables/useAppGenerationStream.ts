@@ -7,6 +7,8 @@
  * 把视图更新交给调用方传入的 handlers，避免在视图里手写脆弱的文本解析。
  */
 
+import i18n, { currentLang } from '@/locales'
+
 /** 单条生成事件的数据结构（与后端 AppGenerationMessage 对应） */
 export interface AppGenerationEvent {
   type?: string
@@ -95,7 +97,8 @@ export function useAppGenerationStream(handlers: AppGenerationStreamHandlers) {
     hasAnyEvent = false
     hasDoneEvent = false
 
-    const params = new URLSearchParams({ appId, userPrompt })
+    // EventSource 无法设置自定义请求头，语言通过查询参数传递给后端
+    const params = new URLSearchParams({ appId, userPrompt, lang: currentLang() })
     const url = `${baseApiUrl}${STREAM_PATH}?${params.toString()}`
     source = new EventSource(url, { withCredentials: true })
 
@@ -144,10 +147,10 @@ export function useAppGenerationStream(handlers: AppGenerationStreamHandlers) {
       handlers.onBuildStatus?.(p.status || '', p.message || p.content || '')
     })
     on('preview_ready', (p) => {
-      handlers.onPreviewReady?.(p.message || p.content || '预览已更新')
+      handlers.onPreviewReady?.(p.message || p.content || i18n.global.t('common.gen.previewUpdated'))
     })
     on('generation_error', (p) => {
-      handlers.onError?.(p.message || p.content || '生成失败')
+      handlers.onError?.(p.message || p.content || i18n.global.t('common.gen.failed'))
       finalize(true)
     })
 

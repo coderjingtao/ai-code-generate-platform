@@ -1,7 +1,7 @@
 <template>
   <section class="page">
-    <h1 class="page__title">工作台</h1>
-    <p class="page__description">这里将用于放置代码生成输入、配置与执行状态。</p>
+    <h1 class="page__title">{{ $t('workspace.title') }}</h1>
+    <p class="page__description">{{ $t('workspace.description') }}</p>
   </section>
 </template>
 

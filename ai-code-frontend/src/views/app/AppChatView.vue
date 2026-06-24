@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import hljs from 'highlight.js'
@@ -47,6 +48,7 @@ type WithStringId<T> = Omit<T, 'id'> & { id: string }
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const loginUserStore = useLoginUserStore()
 const HISTORY_PAGE_SIZE = 10
 
@@ -115,10 +117,10 @@ const fileContentState = useAsyncState(async (filePath: string) => {
   const url = `/api/static/${codeGenType}_${appId.value}/${filePath}`
   const res = await fetch(`${url}?t=${Date.now()}`)
   if (!res.ok) {
-    throw new Error(`加载文件失败: ${res.statusText}`)
+    throw new Error(t('appChat.errors.loadFileFailed', { status: res.statusText }))
   }
   return res.text()
-}, '加载文件失败，请稍后重试')
+}, t('appChat.errors.loadFileFailedRetry'))
 const loadingContent = fileContentState.loading
 const fileContentError = fileContentState.error
 
@@ -181,9 +183,11 @@ const adminQueryEnabled = computed(() => {
 })
 const adminModeEnabled = ref(false)
 
-const appName = computed(() => appInfo.value?.appName || `应用 #${appId.value}`)
+const appName = computed(
+  () => appInfo.value?.appName || t('appChat.title.defaultAppName', { id: appId.value }),
+)
 const baseApiUrl = computed(() => String(request.defaults.baseURL || '/api').replace(/\/$/, ''))
-const loginUserName = computed(() => loginUserStore.loginUser?.userName || '我')
+const loginUserName = computed(() => loginUserStore.loginUser?.userName || t('appChat.title.me'))
 const loginUserAvatar = computed(() => loginUserStore.loginUser?.userAvatar || '')
 const isOwner = computed(() => {
   const loginUserId = loginUserStore.loginUser?.id
@@ -198,7 +202,7 @@ const appCreatorName = computed(() => {
   if (isOwner.value && loginUserStore.loginUser?.userName) {
     return loginUserStore.loginUser.userName
   }
-  return '匿名用户'
+  return t('appChat.title.anonymousUser')
 })
 const appCreatorAvatar = computed(() => {
   if (appInfo.value?.user?.userAvatar) {
@@ -220,7 +224,7 @@ const selectedElementTitle = computed(() => {
     : elementInfo.className
       ? `${elementInfo.tagName}.${elementInfo.className.split(/\s+/)[0]}`
       : elementInfo.tagName
-  return `已选中元素：${elementName}`
+  return t('appChat.visualEdit.selectedElement', { name: elementName })
 })
 const selectedElementDescription = computed(() => {
   const elementInfo = selectedElementInfo.value
@@ -228,8 +232,12 @@ const selectedElementDescription = computed(() => {
     return ''
   }
 
-  const text = elementInfo.text ? `；文本：${elementInfo.text}` : ''
-  return `选择器：${elementInfo.selector}${text}`
+  return elementInfo.text
+    ? t('appChat.visualEdit.selectorWithText', {
+        selector: elementInfo.selector,
+        text: elementInfo.text,
+      })
+    : t('appChat.visualEdit.selector', { selector: elementInfo.selector })
 })
 const activeHoverElementInfo = computed(() => {
   if (!hoverElementInfo.value) {
@@ -368,25 +376,25 @@ const setupVisualIframeEditor = () => {
 const handlePreviewLoad = () => {
   const setupSucceeded = setupVisualIframeEditor()
   if (visualEditMode.value && !setupSucceeded) {
-    message.warning('预览页面暂时无法进入可视化编辑模式')
+    message.warning(t('appChat.visualEdit.previewCannotEnter'))
     visualEditMode.value = false
   }
 }
 
 const toggleVisualEditMode = () => {
   if (!previewReady.value || !previewUrl.value) {
-    message.warning('预览生成完成后才能进入编辑模式')
+    message.warning(t('appChat.visualEdit.enterAfterPreview'))
     return
   }
 
   if (!visualEditMode.value) {
     const enabled = visualIframeEditorRef.value?.enable() || setupVisualIframeEditor()
     if (!enabled) {
-      message.warning('预览页面暂时无法进入可视化编辑模式')
+      message.warning(t('appChat.visualEdit.previewCannotEnter'))
       return
     }
     visualEditMode.value = true
-    message.info('已进入可视化编辑模式，点击预览中的元素即可选中')
+    message.info(t('appChat.visualEdit.entered'))
     return
   }
 
@@ -475,9 +483,13 @@ const loadChatHistory = async (loadMore = false) => {
       return
     }
 
-    message.error(res.data.message || '加载历史消息失败')
+    message.error(res.data.message || t('appChat.messages.loadHistoryFailed'))
   } catch {
-    message.error(loadMore ? '加载更多历史消息失败，请稍后重试' : '加载历史消息失败，请稍后重试')
+    message.error(
+      loadMore
+        ? t('appChat.messages.loadMoreHistoryFailedRetry')
+        : t('appChat.messages.loadHistoryFailedRetry'),
+    )
   } finally {
     if (loadMore) {
       loadingMoreHistory.value = false
@@ -548,7 +560,7 @@ const ensureAdminMode = async () => {
 
 const loadAppInfo = async () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     await router.replace('/')
     return
   }
@@ -567,9 +579,9 @@ const loadAppInfo = async () => {
       }
       return
     }
-    message.error(res.data.message || '获取应用信息失败')
+    message.error(res.data.message || t('appChat.messages.loadAppFailed'))
   } catch {
-    message.error('获取应用信息失败，请稍后重试')
+    message.error(t('appChat.messages.loadAppFailedRetry'))
   } finally {
     loadingApp.value = false
   }
@@ -623,7 +635,7 @@ const finalizeGeneration = async (failed = false) => {
     target.streaming = false
     target.statusText = undefined
     if (!target.content.trim()) {
-      target.content = failed ? '生成失败，请稍后重试。' : '已完成。'
+      target.content = failed ? t('appChat.status.generationFailed') : t('appChat.status.done')
     }
   }
   activePath.value = ''
@@ -664,7 +676,7 @@ const stream = useAppGenerationStream({
     selectedFileContent.value = ''
     activePath.value = path
     activeTab.value = 'code'
-    setStatus(`正在生成 ${path}`)
+    setStatus(t('appChat.status.generatingFile', { path }))
   },
   onFileDelta: (path, content, overwrite) => {
     selectedPath.value = path
@@ -675,7 +687,7 @@ const stream = useAppGenerationStream({
     if (activePath.value === path) {
       activePath.value = ''
     }
-    setStatus(`已生成 ${path}`)
+    setStatus(t('appChat.status.generatedFile', { path }))
   },
   onFileDelete: (path) => {
     files.value = files.value.filter((file) => file !== path)
@@ -683,7 +695,7 @@ const stream = useAppGenerationStream({
       selectedPath.value = ''
       selectedFileContent.value = ''
     }
-    setStatus(`已删除 ${path}`)
+    setStatus(t('appChat.status.deletedFile', { path }))
   },
   onBuildStatus: (_status, statusMessage) => {
     setStatus(statusMessage)
@@ -708,17 +720,17 @@ const stream = useAppGenerationStream({
 const sendPrompt = async (promptInput?: string) => {
   const prompt = (promptInput ?? inputPrompt.value).trim()
   if (!prompt) {
-    message.warning('请输入消息后再发送')
+    message.warning(t('appChat.messages.enterMessage'))
     return
   }
 
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     return
   }
 
   if (sending.value) {
-    message.info('上一条消息还在生成中，请稍候')
+    message.info(t('appChat.messages.generatingPrevious'))
     return
   }
 
@@ -736,7 +748,7 @@ const sendPrompt = async (promptInput?: string) => {
     role: 'assistant',
     content: '',
     streaming: true,
-    statusText: 'AI 正在生成…',
+    statusText: t('appChat.status.generating'),
   }
   currentAssistantId = assistantMessage.id
 
@@ -761,7 +773,7 @@ const sendPrompt = async (promptInput?: string) => {
 
 const handleDeploy = async () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     return
   }
 
@@ -772,12 +784,12 @@ const handleDeploy = async () => {
       deployedUrl.value = res.data.data
       deployModalOpen.value = true
       activeTab.value = 'preview'
-      message.success('部署成功')
+      message.success(t('appChat.deploy.success'))
       return
     }
-    message.error(res.data.message || '部署失败')
+    message.error(res.data.message || t('appChat.deploy.failed'))
   } catch {
-    message.error('部署失败，请稍后重试')
+    message.error(t('appChat.deploy.failedRetry'))
   } finally {
     deploying.value = false
   }
@@ -789,9 +801,9 @@ const copyDeployUrl = async () => {
   }
   try {
     await navigator.clipboard.writeText(deployedUrl.value)
-    message.success('部署地址已复制')
+    message.success(t('appChat.deploy.urlCopied'))
   } catch {
-    message.error('复制失败，请手动复制')
+    message.error(t('appChat.deploy.copyFailed'))
   }
 }
 
@@ -837,7 +849,7 @@ const saveBlobAsFile = (blob: Blob, fileName: string) => {
 
 const handleDownloadCode = async () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     return
   }
 
@@ -851,9 +863,9 @@ const handleDownloadCode = async () => {
     const fileName = parseDownloadFileName(contentDisposition) || `${appName.value}.zip`
     const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/zip' })
     saveBlobAsFile(blob, fileName)
-    message.success('代码下载已开始')
+    message.success(t('appChat.messages.downloadStarted'))
   } catch {
-    message.error('下载代码失败，请稍后重试')
+    message.error(t('appChat.messages.downloadFailedRetry'))
   } finally {
     downloadingCode.value = false
   }
@@ -865,7 +877,7 @@ const openAppDetail = () => {
 
 const goToAppEdit = () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     return
   }
 
@@ -878,7 +890,7 @@ const goToAppEdit = () => {
 const handleDeleteApp = async () => {
   const currentId = appInfo.value?.id
   if (!currentId) {
-    message.error('应用 ID 不合法')
+    message.error(t('appChat.messages.invalidAppId'))
     return
   }
 
@@ -889,14 +901,14 @@ const handleDeleteApp = async () => {
       ? await deleteAppByAdmin({ id: currentId })
       : await deleteMyApp({ id: currentId })
     if (res.data.code === 0) {
-      message.success('删除应用成功')
+      message.success(t('appChat.messages.deleteSuccess'))
       appDetailOpen.value = false
       await router.replace('/')
       return
     }
-    message.error(res.data.message || '删除应用失败')
+    message.error(res.data.message || t('appChat.messages.deleteFailed'))
   } catch {
-    message.error('删除应用失败，请稍后重试')
+    message.error(t('appChat.messages.deleteFailedRetry'))
   } finally {
     deletingApp.value = false
   }
@@ -944,20 +956,23 @@ onBeforeUnmount(() => {
       <div>
         <h1 class="app-chat-view__title">{{ appName }}</h1>
         <p class="app-chat-view__meta">
-          <span>应用 ID：{{ appId }}</span>
+          <span>{{ $t('appChat.meta.appId', { id: appId }) }}</span>
           <span class="app-chat-view__meta-separator">·</span>
           <span>
-            生成类型：<strong class="app-chat-view__code-type">{{
-              appInfo?.codeGenType || '-'
-            }}</strong>
+            {{ $t('appChat.meta.codeGenType')
+            }}<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
           </span>
         </p>
       </div>
       <a-space>
-        <a-button @click="router.push('/')">返回首页</a-button>
-        <a-button @click="openAppDetail">应用详情</a-button>
-        <a-button :loading="downloadingCode" @click="handleDownloadCode">下载代码</a-button>
-        <a-button type="primary" :loading="deploying" @click="handleDeploy">部署应用</a-button>
+        <a-button @click="router.push('/')">{{ $t('appChat.buttons.backHome') }}</a-button>
+        <a-button @click="openAppDetail">{{ $t('appChat.buttons.appDetail') }}</a-button>
+        <a-button :loading="downloadingCode" @click="handleDownloadCode">{{
+          $t('appChat.buttons.downloadCode')
+        }}</a-button>
+        <a-button type="primary" :loading="deploying" @click="handleDeploy">{{
+          $t('appChat.buttons.deploy')
+        }}</a-button>
       </a-space>
     </header>
 
@@ -972,10 +987,10 @@ onBeforeUnmount(() => {
               :loading="loadingMoreHistory"
               @click="loadMoreHistoryMessages"
             >
-              加载更多
+              {{ $t('appChat.buttons.loadMore') }}
             </a-button>
             <span v-else class="chat-panel__history-tip">
-              已展示全部 {{ totalHistory || historyLoadedCount }} 条历史消息
+              {{ $t('appChat.history.allLoaded', { count: totalHistory || historyLoadedCount }) }}
             </span>
           </div>
 
@@ -1019,7 +1034,7 @@ onBeforeUnmount(() => {
           <StateView
             :loading="loadingHistory && messages.length === 0"
             :empty="!loadingHistory && messages.length === 0"
-            empty-text="输入你的需求后，AI 会在这里实时输出生成过程"
+            :empty-text="$t('appChat.empty.chat')"
             :retryable="false"
           />
         </div>
@@ -1038,12 +1053,14 @@ onBeforeUnmount(() => {
           <a-textarea
             v-model:value="inputPrompt"
             :auto-size="{ minRows: 3, maxRows: 6 }"
-            placeholder="继续输入新的修改指令，例如：把按钮换成圆角并补充 FAQ 区域"
+            :placeholder="$t('appChat.placeholders.input')"
             @keydown.enter.exact.prevent="sendCurrentPrompt"
           />
           <div class="chat-panel__editor-footer">
-            <span>按 Enter 发送，Shift + Enter 换行</span>
-            <a-button type="primary" :loading="sending" @click="sendCurrentPrompt">发送</a-button>
+            <span>{{ $t('appChat.editor.hint') }}</span>
+            <a-button type="primary" :loading="sending" @click="sendCurrentPrompt">{{
+              $t('appChat.buttons.send')
+            }}</a-button>
           </div>
         </div>
       </section>
@@ -1056,14 +1073,14 @@ onBeforeUnmount(() => {
               :class="{ active: activeTab === 'preview' }"
               @click="activeTab = 'preview'"
             >
-              预览
+              {{ $t('appChat.tabs.preview') }}
             </div>
             <div
               class="workspace-tab-item"
               :class="{ active: activeTab === 'code' }"
               @click="activeTab = 'code'"
             >
-              代码
+              {{ $t('appChat.tabs.code') }}
             </div>
           </div>
 
@@ -1077,9 +1094,11 @@ onBeforeUnmount(() => {
               :disabled="sending"
               @click="toggleVisualEditMode"
             >
-              {{ visualEditMode ? '退出编辑' : '编辑模式' }}
+              {{ visualEditMode ? $t('appChat.buttons.exitEdit') : $t('appChat.buttons.editMode') }}
             </a-button>
-            <a :href="previewUrl" target="_blank" rel="noopener noreferrer"> 新窗口打开 </a>
+            <a :href="previewUrl" target="_blank" rel="noopener noreferrer">
+              {{ $t('appChat.buttons.openInNewWindow') }}
+            </a>
           </div>
         </div>
 
@@ -1118,8 +1137,8 @@ onBeforeUnmount(() => {
                 ></div>
               </div>
               <div v-if="!previewReady || !previewUrl" class="preview-placeholder">
-                <p v-if="sending">代码生成中，完成后自动展示预览...</p>
-                <p v-else>发送消息后，生成完成会在这里展示网站效果。</p>
+                <p v-if="sending">{{ $t('appChat.preview.generating') }}</p>
+                <p v-else>{{ $t('appChat.preview.idle') }}</p>
               </div>
             </div>
           </div>
@@ -1127,7 +1146,7 @@ onBeforeUnmount(() => {
           <!-- Code Tab Content -->
           <div v-if="activeTab === 'code'" class="code-viewer-panel">
             <aside class="code-viewer-sidebar">
-              <div class="code-viewer-sidebar__title">文件树</div>
+              <div class="code-viewer-sidebar__title">{{ $t('appChat.code.fileTree') }}</div>
               <AppFileTree
                 :files="files"
                 :selected-path="selectedPath"
@@ -1137,7 +1156,9 @@ onBeforeUnmount(() => {
             </aside>
             <main class="code-viewer-main">
               <header class="code-viewer-header">
-                <span class="code-viewer-path">{{ selectedPath || '未选择文件' }}</span>
+                <span class="code-viewer-path">{{
+                  selectedPath || $t('appChat.empty.noFileSelected')
+                }}</span>
               </header>
               <div ref="codeViewerContainerRef" class="code-viewer-container">
                 <StateView :loading="loadingContent" :error="fileContentError" :retryable="false">
@@ -1148,7 +1169,7 @@ onBeforeUnmount(() => {
                     <pre class="code-viewer-pre"><code v-html="highlightedCode"></code></pre>
                   </div>
                   <div v-else class="code-viewer-empty">
-                    <p>暂无代码内容</p>
+                    <p>{{ $t('appChat.empty.noCode') }}</p>
                   </div>
                 </StateView>
               </div>
@@ -1164,59 +1185,62 @@ onBeforeUnmount(() => {
 
     <a-modal
       v-model:open="deployModalOpen"
-      title="部署成功"
+      :title="$t('appChat.deploy.modalTitle')"
       :footer="null"
       :mask-closable="true"
       width="620px"
     >
-      <p>访问地址</p>
+      <p>{{ $t('appChat.deploy.accessUrl') }}</p>
       <a-input :value="deployedUrl" readonly />
       <div class="deploy-modal__actions">
         <a-space>
-          <a-button @click="copyDeployUrl">复制地址</a-button>
-          <a-button type="primary" @click="openDeployUrl">打开站点</a-button>
+          <a-button @click="copyDeployUrl">{{ $t('appChat.deploy.copyUrl') }}</a-button>
+          <a-button type="primary" @click="openDeployUrl">{{
+            $t('appChat.deploy.openSite')
+          }}</a-button>
         </a-space>
       </div>
     </a-modal>
 
     <a-modal
       v-model:open="appDetailOpen"
-      title="应用详情"
+      :title="$t('appChat.detail.title')"
       :footer="null"
       :mask-closable="true"
       width="560px"
     >
       <section class="app-detail">
         <div class="app-detail__block">
-          <h3>应用基础信息</h3>
+          <h3>{{ $t('appChat.detail.basicInfo') }}</h3>
           <div class="app-detail__creator">
             <a-avatar :size="44" :src="appCreatorAvatar">{{
               appCreatorName.slice(0, 1).toUpperCase()
             }}</a-avatar>
             <div>
-              <p class="app-detail__label">创建者</p>
+              <p class="app-detail__label">{{ $t('appChat.detail.creator') }}</p>
               <p class="app-detail__value">{{ appCreatorName }}</p>
             </div>
           </div>
-          <p class="app-detail__time">创建时间：{{ appInfo?.createTime || '-' }}</p>
+          <p class="app-detail__time">
+            {{ $t('appChat.detail.createTime', { time: appInfo?.createTime || '-' }) }}
+          </p>
           <p class="app-detail__meta">
-            生成类型：<strong class="app-chat-view__code-type">{{
-              appInfo?.codeGenType || '-'
-            }}</strong>
+            {{ $t('appChat.detail.codeGenType')
+            }}<strong class="app-chat-view__code-type">{{ appInfo?.codeGenType || '-' }}</strong>
           </p>
         </div>
 
         <div v-if="canManageApp" class="app-detail__block">
-          <h3>操作栏</h3>
+          <h3>{{ $t('appChat.detail.operations') }}</h3>
           <a-space>
-            <a-button @click="goToAppEdit">修改</a-button>
+            <a-button @click="goToAppEdit">{{ $t('appChat.detail.modify') }}</a-button>
             <a-popconfirm
-              title="确认删除该应用吗？"
-              ok-text="确认"
-              cancel-text="取消"
+              :title="$t('appChat.detail.confirmDelete')"
+              :ok-text="$t('common.actions.confirm')"
+              :cancel-text="$t('common.actions.cancel')"
               @confirm="handleDeleteApp"
             >
-              <a-button danger :loading="deletingApp">删除</a-button>
+              <a-button danger :loading="deletingApp">{{ $t('common.actions.delete') }}</a-button>
             </a-popconfirm>
           </a-space>
         </div>
@@ -1343,6 +1367,8 @@ onBeforeUnmount(() => {
   padding-left: 46px;
   padding-right: 46px;
   min-height: 36px;
+  /* 防止 flex 列布局在内容超出时压缩消息项导致气泡相互覆盖（多行消息尤为明显） */
+  flex-shrink: 0;
 }
 
 .chat-message__avatar {

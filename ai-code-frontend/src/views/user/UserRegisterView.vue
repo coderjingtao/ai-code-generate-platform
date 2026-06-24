@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import { register as userRegister } from '@/api/usersController'
 
+const { t } = useI18n()
 const router = useRouter()
 const loading = ref(false)
 
@@ -14,22 +16,24 @@ const formState = reactive<API.UserRegisterRequest>({
   checkPassword: '',
 })
 
-const emailRules = [
-  { required: true, message: '请输入邮箱' },
-  { type: 'email', message: '请输入有效的邮箱地址' },
-]
-const passwordRules = [{ required: true, message: '请输入密码' }]
-const checkPasswordRules = [
-  { required: true, message: '请再次输入密码' },
+const emailRules = computed(() => [
+  { required: true, message: t('register.rules.emailRequired') },
+  { type: 'email', message: t('register.rules.emailInvalid') },
+])
+const passwordRules = computed(() => [
+  { required: true, message: t('register.rules.passwordRequired') },
+])
+const checkPasswordRules = computed(() => [
+  { required: true, message: t('register.rules.checkPasswordRequired') },
   {
     validator: async (_rule: unknown, value: string | undefined) => {
       if (!value || value === formState.userPassword) {
         return Promise.resolve()
       }
-      return Promise.reject(new Error('两次输入的密码不一致'))
+      return Promise.reject(new Error(t('register.rules.passwordMismatch')))
     },
   },
-]
+])
 
 const handleFinish = async () => {
   loading.value = true
@@ -40,13 +44,13 @@ const handleFinish = async () => {
       checkPassword: formState.checkPassword,
     })
     if (res.data.code === 0) {
-      message.success('注册成功')
+      message.success(t('register.messages.success'))
       await router.replace('/user/login')
       return
     }
-    message.error(res.data.message || '注册失败，请稍后重试')
+    message.error(res.data.message || t('register.messages.failed'))
   } catch {
-    message.error('注册失败，请稍后重试')
+    message.error(t('register.messages.error'))
   } finally {
     loading.value = false
   }
@@ -56,41 +60,49 @@ const handleFinish = async () => {
 <template>
   <div class="user-register-view">
     <a-card class="register-card" :bordered="false">
-      <h1 class="register-title">欢迎注册</h1>
+      <h1 class="register-title">{{ $t('register.title') }}</h1>
       <p class="register-subtitle">AI Code Generation Platform</p>
       <p class="register-slogan">
         Generate entire applications without writing a single line of code.
       </p>
 
       <a-form layout="vertical" :model="formState" autocomplete="off" @finish="handleFinish">
-        <a-form-item label="邮箱" name="userEmail" :rules="emailRules">
-          <a-input v-model:value="formState.userEmail" placeholder="请输入邮箱" size="large" />
-        </a-form-item>
-
-        <a-form-item label="密码" name="userPassword" :rules="passwordRules">
-          <a-input-password
-            v-model:value="formState.userPassword"
-            placeholder="请输入密码"
+        <a-form-item :label="$t('register.form.email')" name="userEmail" :rules="emailRules">
+          <a-input
+            v-model:value="formState.userEmail"
+            :placeholder="$t('register.placeholders.email')"
             size="large"
           />
         </a-form-item>
 
-        <a-form-item label="确认密码" name="checkPassword" :rules="checkPasswordRules">
+        <a-form-item :label="$t('register.form.password')" name="userPassword" :rules="passwordRules">
+          <a-input-password
+            v-model:value="formState.userPassword"
+            :placeholder="$t('register.placeholders.password')"
+            size="large"
+          />
+        </a-form-item>
+
+        <a-form-item
+          :label="$t('register.form.checkPassword')"
+          name="checkPassword"
+          :rules="checkPasswordRules"
+        >
           <a-input-password
             v-model:value="formState.checkPassword"
-            placeholder="请再次输入密码"
+            :placeholder="$t('register.placeholders.checkPassword')"
             size="large"
           />
         </a-form-item>
 
         <div class="login-tip">
-          已有账号，
-          <RouterLink to="/user/login">去登录</RouterLink>
+          {{ $t('register.links.hasAccount') }}
+          <RouterLink to="/user/login">{{ $t('register.links.goLogin') }}</RouterLink>
         </div>
 
         <a-form-item class="submit-wrap">
           <a-button type="primary" html-type="submit" size="large" block :loading="loading">
-            注册
+            {{ $t('common.header.register') }}
           </a-button>
         </a-form-item>
       </a-form>

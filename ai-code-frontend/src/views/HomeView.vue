@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import AppCard from '@/components/AppCard.vue'
 import { DEPLOY_BASE_URL } from '@/config/env'
@@ -20,6 +21,7 @@ interface AppListState {
 const router = useRouter()
 const route = useRoute()
 const loginUserStore = useLoginUserStore()
+const { t } = useI18n()
 
 const createPrompt = ref('')
 const creating = ref(false)
@@ -28,35 +30,40 @@ const composerRef = ref<HTMLElement>()
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser?.id))
 
-const inspirationPrompts = [
-  '做一个咖啡品牌官网，像独立杂志一样温暖高级',
-  '做一个 AI 产品发布页，黑色科技感，首屏有强 CTA',
-  '做一个音乐节活动页，明亮、大胆、适合移动端传播',
-  '做一个个人作品集，像策展空间，突出项目和联系入口',
-]
+const inspirationPrompts = computed(() => [
+  t('home.inspirationPrompts.coffee'),
+  t('home.inspirationPrompts.aiProduct'),
+  t('home.inspirationPrompts.musicFestival'),
+  t('home.inspirationPrompts.portfolio'),
+])
 
-const styleSignals = ['品牌气质', '页面结构', '交互动效', '发布代码']
+const styleSignals = computed(() => [
+  t('home.styleSignals.brandFeel'),
+  t('home.styleSignals.pageStructure'),
+  t('home.styleSignals.interactions'),
+  t('home.styleSignals.shipCode'),
+])
 
-const workflowSteps = [
+const workflowSteps = computed(() => [
   {
-    title: '写下想法',
-    text: '用一句话说明行业、氛围、功能和你想打动的人。',
+    title: t('home.workflow.step1.title'),
+    text: t('home.workflow.step1.text'),
   },
   {
-    title: '生成风格',
-    text: 'AI 会把抽象想法转成页面结构、视觉语言和可继续对话的方案。',
+    title: t('home.workflow.step2.title'),
+    text: t('home.workflow.step2.text'),
   },
   {
-    title: '继续打磨',
-    text: '像和设计师协作一样，调整色彩、文案、布局和交互细节。',
+    title: t('home.workflow.step3.title'),
+    text: t('home.workflow.step3.text'),
   },
-]
+])
 
-const showcaseNotes = [
-  '从“做个活动页”到完整报名体验',
-  '从“高级一点”到统一的品牌视觉',
-  '从“我有个 idea”到可预览的网站',
-]
+const showcaseNotes = computed(() => [
+  t('home.showcaseNotes.event'),
+  t('home.showcaseNotes.brand'),
+  t('home.showcaseNotes.idea'),
+])
 
 const myState = reactive<AppListState>({
   loading: false,
@@ -78,7 +85,7 @@ const goodState = reactive<AppListState>({
 
 const goToChat = (record: API.AppVO, admin = false) => {
   if (!record.id) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('home.messages.appIdMissing'))
     return
   }
 
@@ -91,7 +98,7 @@ const goToChat = (record: API.AppVO, admin = false) => {
 const goToWork = (record: API.AppVO) => {
   const deployKey = record.deployKey?.trim()
   if (!deployKey) {
-    message.info('该应用暂未部署作品')
+    message.info(t('home.messages.notDeployed'))
     return
   }
   window.open(`${DEPLOY_BASE_URL}/${encodeURIComponent(deployKey)}`, '_blank')
@@ -122,9 +129,9 @@ const loadMyApps = async () => {
       return
     }
 
-    message.error(res.data.message || '获取我的作品失败')
+    message.error(res.data.message || t('home.messages.loadMyFailed'))
   } catch {
-    message.error('获取我的作品失败，请稍后重试')
+    message.error(t('home.messages.loadMyError'))
   } finally {
     myState.loading = false
   }
@@ -147,9 +154,9 @@ const loadGoodApps = async () => {
       return
     }
 
-    message.error(res.data.message || '获取精选案例失败')
+    message.error(res.data.message || t('home.messages.loadGoodFailed'))
   } catch {
-    message.error('获取精选案例失败，请稍后重试')
+    message.error(t('home.messages.loadGoodError'))
   } finally {
     goodState.loading = false
   }
@@ -158,12 +165,12 @@ const loadGoodApps = async () => {
 const handleCreateApp = async () => {
   const trimmedPrompt = createPrompt.value.trim()
   if (!trimmedPrompt) {
-    message.warning('请输入应用提示词')
+    message.warning(t('home.messages.promptRequired'))
     return
   }
 
   if (!isLoggedIn.value) {
-    message.info('请先登录后再创建应用')
+    message.info(t('home.messages.loginBeforeCreate'))
     goToLogin()
     return
   }
@@ -178,9 +185,9 @@ const handleCreateApp = async () => {
       })
       return
     }
-    message.error(res.data.message || '创建应用失败')
+    message.error(res.data.message || t('home.messages.createFailed'))
   } catch {
-    message.error('创建应用失败，请稍后重试')
+    message.error(t('home.messages.createError'))
   } finally {
     creating.value = false
   }
@@ -291,17 +298,17 @@ onMounted(() => {
       <div class="hero__grain" />
       <div class="hero__inner">
         <div class="hero__content">
-          <p class="hero__eyebrow">NoCode AI Website Studio</p>
-          <h1 class="hero__title">一句话，呈所想。</h1>
+          <p class="hero__eyebrow">{{ $t('home.hero.eyebrow') }}</p>
+          <h1 class="hero__title">{{ $t('home.hero.title') }}</h1>
           <p class="hero__subtitle">
-            把脑海里的 idea 写下来，让NoCode 把它快速变为现实。
+            {{ $t('home.hero.subtitle') }}
           </p>
 
           <div ref="composerRef" class="composer">
             <a-textarea
               v-model:value="createPrompt"
               :auto-size="{ minRows: 4, maxRows: 7 }"
-              placeholder="例如：做一个咖啡品牌官网，像独立杂志一样温暖高级，首屏有预约按钮..."
+              :placeholder="$t('home.composer.placeholder')"
               class="composer__textarea"
             />
 
@@ -317,7 +324,7 @@ onMounted(() => {
                 class="composer__button"
                 @click="handleCreateApp"
               >
-                开始创建
+                {{ $t('home.hero.startCreate') }}
               </a-button>
             </div>
           </div>
@@ -357,19 +364,19 @@ onMounted(() => {
       <section v-if="isLoggedIn" ref="mySectionRef" class="app-section">
         <div class="app-section__header">
           <div>
-            <span class="section-kicker">Your studio</span>
-            <h2>我的作品</h2>
+            <span class="section-kicker">{{ $t('home.mySection.kicker') }}</span>
+            <h2>{{ $t('home.mySection.title') }}</h2>
           </div>
           <div class="app-section__query">
             <a-input
               v-model:value="myState.keyword"
               allow-clear
-              placeholder="按应用名称搜索"
+              :placeholder="$t('home.mySection.searchPlaceholder')"
               class="app-section__search"
               @pressEnter="handleMySearch"
             />
-            <a-button type="primary" @click="handleMySearch">查询</a-button>
-            <a-button @click="handleMyReset">重置</a-button>
+            <a-button type="primary" @click="handleMySearch">{{ $t('common.actions.search') }}</a-button>
+            <a-button @click="handleMyReset">{{ $t('common.actions.reset') }}</a-button>
           </div>
         </div>
 
@@ -383,7 +390,7 @@ onMounted(() => {
               @view-work="goToWork"
             />
           </div>
-          <a-empty v-else description="暂无作品，先从上方输入提示词创建一个吧" />
+          <a-empty v-else :description="$t('home.mySection.empty')" />
         </a-spin>
 
         <div class="app-section__pagination">
@@ -392,7 +399,7 @@ onMounted(() => {
             :page-size="myState.pageSize"
             :total="myState.total"
             :show-size-changer="true"
-            :show-total="(count: number) => `共 ${count} 条`"
+            :show-total="(count: number) => t('home.pagination.total', { count })"
             :page-size-options="['8', '12', '16', '20']"
             @change="onMyPageChange"
           />
@@ -402,8 +409,8 @@ onMounted(() => {
       <section class="app-section">
         <div class="app-section__header">
           <div>
-            <span class="section-kicker">Gallery</span>
-            <h2>精选案例</h2>
+            <span class="section-kicker">{{ $t('home.gallery.kicker') }}</span>
+            <h2>{{ $t('home.gallery.title') }}</h2>
           </div>
         </div>
 
@@ -417,15 +424,15 @@ onMounted(() => {
               @view-work="goToWork"
             />
           </div>
-          <a-empty v-else description="暂无精选案例" />
+          <a-empty v-else :description="$t('home.gallery.empty')" />
         </a-spin>
       </section>
 
       
       <section class="manifest-section">
         <div class="manifest-section__copy">
-          <span class="section-kicker">Why it works</span>
-          <h2>不是模板库，是你的创意现场。</h2>
+          <span class="section-kicker">{{ $t('home.manifest.kicker') }}</span>
+          <h2>{{ $t('home.manifest.title') }}</h2>
         </div>
         <div class="manifest-section__notes">
           <p v-for="item in showcaseNotes" :key="item">{{ item }}</p>
@@ -440,10 +447,10 @@ onMounted(() => {
       </section>
 
       <section class="final-cta">
-        <span class="section-kicker">Start now</span>
-        <h2>把那个还没命名的想法，先写成第一句话。</h2>
+        <span class="section-kicker">{{ $t('home.finalCta.kicker') }}</span>
+        <h2>{{ $t('home.finalCta.title') }}</h2>
         <a-button type="primary" shape="round" size="large" @click="scrollToComposer">
-          回到输入框
+          {{ $t('home.finalCta.backToComposer') }}
         </a-button>
       </section>
     </section>

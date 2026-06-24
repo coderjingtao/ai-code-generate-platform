@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import i18n from '@/locales'
 
 /**
  * 通用的异步请求状态包装：统一管理 loading / error，并把异常收敛成可展示的错误文案。
@@ -15,7 +16,7 @@ export interface UseAsyncStateReturn<TArgs extends unknown[], TResult> {
 
 export function useAsyncState<TArgs extends unknown[], TResult>(
   fn: (...args: TArgs) => Promise<TResult>,
-  errorText = '加载失败，请稍后重试',
+  errorText?: string,
 ): UseAsyncStateReturn<TArgs, TResult> {
   const loading = ref(false)
   const error = ref('')
@@ -26,7 +27,8 @@ export function useAsyncState<TArgs extends unknown[], TResult>(
     try {
       return await fn(...args)
     } catch (err: unknown) {
-      const messageText = err instanceof Error && err.message ? err.message : errorText
+      const fallback = errorText ?? i18n.global.t('common.state.loadFailed')
+      const messageText = err instanceof Error && err.message ? err.message : fallback
       error.value = messageText
       return undefined
     } finally {

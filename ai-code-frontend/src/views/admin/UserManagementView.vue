@@ -2,8 +2,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import { addUser, deleteUser, listUserVoByPage, updateUser } from '@/api/usersController'
+
+const { t } = useI18n()
 
 interface UserDrawerForm {
   id?: number
@@ -31,10 +34,10 @@ const searchParams = reactive<API.UserQueryRequest>({
   userRole: undefined,
 })
 
-const roleOptions = [
-  { label: '普通用户', value: 'user' },
-  { label: '管理员', value: 'admin' },
-]
+const roleOptions = computed(() => [
+  { label: t('adminUser.role.user'), value: 'user' },
+  { label: t('adminUser.role.admin'), value: 'admin' },
+])
 
 const drawerForm = reactive<UserDrawerForm>({
   id: undefined,
@@ -45,49 +48,51 @@ const drawerForm = reactive<UserDrawerForm>({
   userRole: 'user',
 })
 
-const drawerTitle = computed(() => (drawerMode.value === 'create' ? '创建用户' : '编辑用户'))
+const drawerTitle = computed(() =>
+  drawerMode.value === 'create' ? t('adminUser.title.create') : t('adminUser.title.edit'),
+)
 
-const columns: TableColumnsType<API.UserVO> = [
+const columns = computed<TableColumnsType<API.UserVO>>(() => [
   {
-    title: 'ID',
+    title: t('adminUser.columns.id'),
     dataIndex: 'id',
     width: 90,
   },
   {
-    title: '头像',
+    title: t('adminUser.columns.userAvatar'),
     dataIndex: 'userAvatar',
     width: 90,
   },
   {
-    title: '用户名',
+    title: t('adminUser.columns.userName'),
     dataIndex: 'userName',
     width: 180,
   },
   {
-    title: '邮箱',
+    title: t('adminUser.columns.userEmail'),
     dataIndex: 'userEmail',
     width: 180,
   },
   {
-    title: '简介',
+    title: t('adminUser.columns.userProfile'),
     dataIndex: 'userProfile',
   },
   {
-    title: '角色',
+    title: t('adminUser.columns.userRole'),
     dataIndex: 'userRole',
     width: 120,
   },
   {
-    title: '创建时间',
+    title: t('adminUser.columns.createTime'),
     dataIndex: 'createTime',
     width: 220,
   },
   {
-    title: '操作',
+    title: t('adminUser.columns.action'),
     key: 'action',
     width: 170,
   },
-]
+])
 
 const resetDrawerForm = () => {
   drawerForm.id = undefined
@@ -114,9 +119,9 @@ const loadData = async () => {
       return
     }
 
-    message.error(res.data.message || '获取用户列表失败')
+    message.error(res.data.message || t('adminUser.messages.loadFailed'))
   } catch {
-    message.error('获取用户列表失败，请稍后重试')
+    message.error(t('adminUser.messages.loadFailedRetry'))
   } finally {
     loading.value = false
   }
@@ -150,7 +155,7 @@ const openCreateDrawer = () => {
 
 const openEditDrawer = (record: API.UserVO) => {
   if (!record.id) {
-    message.warning('未找到用户 ID，无法编辑')
+    message.warning(t('adminUser.messages.noIdEdit'))
     return
   }
 
@@ -173,17 +178,17 @@ const submitDrawer = async () => {
   const trimmedUserEmail = drawerForm.userEmail.trim()
 
   if (!trimmedUserName) {
-    message.warning('请输入用户名')
+    message.warning(t('adminUser.messages.enterUserName'))
     return
   }
 
   if (drawerMode.value === 'create' && !trimmedUserEmail) {
-    message.warning('请输入邮箱')
+    message.warning(t('adminUser.messages.enterEmail'))
     return
   }
 
   if (drawerMode.value === 'edit' && !drawerForm.id) {
-    message.warning('用户 ID 不存在，无法提交')
+    message.warning(t('adminUser.messages.missingIdSubmit'))
     return
   }
 
@@ -199,14 +204,14 @@ const submitDrawer = async () => {
       })
 
       if (res.data.code === 0) {
-        message.success('创建用户成功')
+        message.success(t('adminUser.messages.createSuccess'))
         drawerOpen.value = false
         searchParams.pageNum = 1
         await loadData()
         return
       }
 
-      message.error(res.data.message || '创建用户失败')
+      message.error(res.data.message || t('adminUser.messages.createFailed'))
       return
     }
 
@@ -219,15 +224,19 @@ const submitDrawer = async () => {
     })
 
     if (res.data.code === 0) {
-      message.success('编辑用户成功')
+      message.success(t('adminUser.messages.updateSuccess'))
       drawerOpen.value = false
       await loadData()
       return
     }
 
-    message.error(res.data.message || '编辑用户失败')
+    message.error(res.data.message || t('adminUser.messages.updateFailed'))
   } catch {
-    message.error(drawerMode.value === 'create' ? '创建用户失败，请稍后重试' : '编辑用户失败，请稍后重试')
+    message.error(
+      drawerMode.value === 'create'
+        ? t('adminUser.messages.createFailedRetry')
+        : t('adminUser.messages.updateFailedRetry'),
+    )
   } finally {
     drawerSubmitting.value = false
   }
@@ -235,7 +244,7 @@ const submitDrawer = async () => {
 
 const deleteUserById = async (record: API.UserVO) => {
   if (!record.id) {
-    message.warning('未找到用户 ID，无法删除')
+    message.warning(t('adminUser.messages.noIdDelete'))
     return
   }
 
@@ -243,16 +252,16 @@ const deleteUserById = async (record: API.UserVO) => {
   try {
     const res = await deleteUser({ id: record.id })
     if (res.data.code === 0) {
-      message.success('删除用户成功')
+      message.success(t('adminUser.messages.deleteSuccess'))
       if ((searchParams.pageNum ?? 1) > 1 && userList.value.length === 1) {
         searchParams.pageNum = (searchParams.pageNum ?? 1) - 1
       }
       await loadData()
       return
     }
-    message.error(res.data.message || '删除用户失败')
+    message.error(res.data.message || t('adminUser.messages.deleteFailed'))
   } catch {
-    message.error('删除用户失败，请稍后重试')
+    message.error(t('adminUser.messages.deleteFailedRetry'))
   } finally {
     deletingId.value = undefined
   }
@@ -266,30 +275,30 @@ onMounted(() => {
 <template>
   <section class="user-management">
     <a-card class="query-section" :bordered="false">
-      <h2 class="section-title">查询区</h2>
+      <h2 class="section-title">{{ $t('adminUser.title.query') }}</h2>
       <a-form layout="inline" :model="searchParams" @finish="doSearch">
-        <a-form-item label="用户名" name="userName">
+        <a-form-item :label="$t('adminUser.search.userNameLabel')" name="userName">
           <a-input
             v-model:value="searchParams.userName"
-            placeholder="请输入用户名"
+            :placeholder="$t('adminUser.search.userNamePlaceholder')"
             allow-clear
             style="width: 180px"
           />
         </a-form-item>
 
-        <a-form-item label="邮箱" name="userEmail">
+        <a-form-item :label="$t('adminUser.search.userEmailLabel')" name="userEmail">
           <a-input
             v-model:value="searchParams.userEmail"
-            placeholder="请输入邮箱"
+            :placeholder="$t('adminUser.search.userEmailPlaceholder')"
             allow-clear
             style="width: 180px"
           />
         </a-form-item>
 
-        <a-form-item label="角色" name="userRole">
+        <a-form-item :label="$t('adminUser.search.userRoleLabel')" name="userRole">
           <a-select
             v-model:value="searchParams.userRole"
-            placeholder="请选择角色"
+            :placeholder="$t('adminUser.search.userRolePlaceholder')"
             allow-clear
             style="width: 150px"
             :options="roleOptions"
@@ -298,8 +307,8 @@ onMounted(() => {
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" html-type="submit">查询</a-button>
-            <a-button @click="doReset">重置</a-button>
+            <a-button type="primary" html-type="submit">{{ $t('common.actions.search') }}</a-button>
+            <a-button @click="doReset">{{ $t('common.actions.reset') }}</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -307,8 +316,8 @@ onMounted(() => {
 
     <a-card class="table-section" :bordered="false">
       <div class="section-header">
-        <h2 class="section-title">数据展示区</h2>
-        <a-button type="primary" @click="openCreateDrawer">创建用户</a-button>
+        <h2 class="section-title">{{ $t('adminUser.title.data') }}</h2>
+        <a-button type="primary" @click="openCreateDrawer">{{ $t('adminUser.buttons.createUser') }}</a-button>
       </div>
 
       <a-table
@@ -321,7 +330,7 @@ onMounted(() => {
           pageSize: searchParams.pageSize,
           total,
           showSizeChanger: true,
-          showTotal: (count: number) => `共 ${count} 条`,
+          showTotal: (count: number) => $t('adminUser.table.totalCount', { count }),
         }"
         :scroll="{ x: 1360 }"
         @change="onTableChange"
@@ -334,8 +343,8 @@ onMounted(() => {
           </template>
 
           <template v-else-if="column.dataIndex === 'userRole'">
-            <a-tag v-if="record.userRole === 'admin'" color="gold">管理员</a-tag>
-            <a-tag v-else-if="record.userRole === 'user'" color="blue">普通用户</a-tag>
+            <a-tag v-if="record.userRole === 'admin'" color="gold">{{ $t('adminUser.role.admin') }}</a-tag>
+            <a-tag v-else-if="record.userRole === 'user'" color="blue">{{ $t('adminUser.role.user') }}</a-tag>
             <span v-else>-</span>
           </template>
 
@@ -345,14 +354,14 @@ onMounted(() => {
 
           <template v-else-if="column.key === 'action'">
             <a-space>
-              <a-button type="link" @click="openEditDrawer(record)">编辑</a-button>
+              <a-button type="link" @click="openEditDrawer(record)">{{ $t('common.actions.edit') }}</a-button>
               <a-popconfirm
-                title="确认删除该用户吗？"
-                ok-text="确认"
-                cancel-text="取消"
+                :title="$t('adminUser.confirm.deleteTitle')"
+                :ok-text="$t('common.actions.confirm')"
+                :cancel-text="$t('common.actions.cancel')"
                 @confirm="deleteUserById(record)"
               >
-                <a-button type="link" danger :loading="deletingId === record.id">删除</a-button>
+                <a-button type="link" danger :loading="deletingId === record.id">{{ $t('common.actions.delete') }}</a-button>
               </a-popconfirm>
             </a-space>
           </template>
@@ -368,33 +377,33 @@ onMounted(() => {
       @close="closeDrawer"
     >
       <a-form layout="vertical" :model="drawerForm">
-        <a-form-item label="邮箱" :required="drawerMode === 'create'">
+        <a-form-item :label="$t('adminUser.form.emailLabel')" :required="drawerMode === 'create'">
           <a-input
             v-model:value="drawerForm.userEmail"
-            placeholder="请输入邮箱"
+            :placeholder="$t('adminUser.form.emailPlaceholder')"
             :disabled="drawerMode === 'edit'"
           />
         </a-form-item>
 
-        <a-form-item label="用户名" required>
-          <a-input v-model:value="drawerForm.userName" placeholder="请输入用户名" />
+        <a-form-item :label="$t('adminUser.form.userNameLabel')" required>
+          <a-input v-model:value="drawerForm.userName" :placeholder="$t('adminUser.form.userNamePlaceholder')" />
         </a-form-item>
 
-        <a-form-item label="头像链接">
-          <a-input v-model:value="drawerForm.userAvatar" placeholder="请输入头像 URL" />
+        <a-form-item :label="$t('adminUser.form.avatarLabel')">
+          <a-input v-model:value="drawerForm.userAvatar" :placeholder="$t('adminUser.form.avatarPlaceholder')" />
         </a-form-item>
 
-        <a-form-item label="简介">
+        <a-form-item :label="$t('adminUser.form.profileLabel')">
           <a-textarea
             v-model:value="drawerForm.userProfile"
             :maxlength="200"
             :auto-size="{ minRows: 3, maxRows: 5 }"
-            placeholder="请输入用户简介"
+            :placeholder="$t('adminUser.form.profilePlaceholder')"
             allow-clear
           />
         </a-form-item>
 
-        <a-form-item label="角色">
+        <a-form-item :label="$t('adminUser.form.roleLabel')">
           <a-select v-model:value="drawerForm.userRole" :options="roleOptions" />
         </a-form-item>
       </a-form>
@@ -402,8 +411,8 @@ onMounted(() => {
       <template #footer>
         <div class="drawer-footer">
           <a-space>
-            <a-button @click="closeDrawer">取消</a-button>
-            <a-button type="primary" :loading="drawerSubmitting" @click="submitDrawer">保存</a-button>
+            <a-button @click="closeDrawer">{{ $t('common.actions.cancel') }}</a-button>
+            <a-button type="primary" :loading="drawerSubmitting" @click="submitDrawer">{{ $t('common.actions.save') }}</a-button>
           </a-space>
         </div>
       </template>

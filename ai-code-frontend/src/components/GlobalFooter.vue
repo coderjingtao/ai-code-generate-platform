@@ -1,6 +1,6 @@
 <template>
   <a-layout-footer class="global-footer">
-    <span>AI Code Generation Platform by </span>
+    <span>{{ $t('common.footer.poweredBy') }} </span>
     <a
       href="https://www.linkedin.com/in/jingtaojosephliu/"
       target="_blank"

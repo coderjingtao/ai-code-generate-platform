@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType, TablePaginationConfig } from 'ant-design-vue'
 
@@ -8,6 +9,7 @@ import { deleteAppByAdmin, listAppByPageForAdmin, updateAppByAdmin } from '@/api
 import { CODE_GEN_TYPE_CONFIG } from '@/utils/codeGenTypes'
 
 const router = useRouter()
+const { t } = useI18n()
 
 const loading = ref(false)
 const total = ref(0)
@@ -32,68 +34,70 @@ const codeGenTypeOptions = Object.values(CODE_GEN_TYPE_CONFIG).map(({ label, val
   value,
 }))
 
-const sortFieldOptions = [
-  { label: '应用 ID', value: 'id' },
-  { label: '应用名称', value: 'appName' },
-  { label: '优先级', value: 'priority' },
-  { label: '用户 ID', value: 'userId' },
-  { label: '创建时间', value: 'createTime' },
-  { label: '更新时间', value: 'updateTime' },
-]
+const sortFieldOptions = computed(() => [
+  { label: t('adminApp.sortField.id'), value: 'id' },
+  { label: t('adminApp.sortField.appName'), value: 'appName' },
+  { label: t('adminApp.sortField.priority'), value: 'priority' },
+  { label: t('adminApp.sortField.userId'), value: 'userId' },
+  { label: t('adminApp.sortField.createTime'), value: 'createTime' },
+  { label: t('adminApp.sortField.updateTime'), value: 'updateTime' },
+])
 
-const sortOrderOptions = [
-  { label: '升序', value: 'ascend' },
-  { label: '降序', value: 'descend' },
-]
+const sortOrderOptions = computed(() => [
+  { label: t('adminApp.sortOrder.ascend'), value: 'ascend' },
+  { label: t('adminApp.sortOrder.descend'), value: 'descend' },
+])
 
-const columns: TableColumnsType<API.AppVO> = [
+const columns = computed<TableColumnsType<API.AppVO>>(() => [
   {
-    title: 'ID',
+    title: t('adminApp.columns.id'),
     dataIndex: 'id',
     width: 86,
     fixed: 'left',
   },
   {
-    title: '封面',
+    title: t('adminApp.columns.cover'),
     dataIndex: 'cover',
     width: 96,
   },
   {
-    title: '应用名称',
+    title: t('adminApp.columns.appName'),
     dataIndex: 'appName',
     width: 180,
   },
   {
-    title: '部署',
+    title: t('adminApp.columns.deployKey'),
     dataIndex: 'deployKey',
     width: 100,
   },
   {
-    title: '优先级',
+    title: t('adminApp.columns.priority'),
     dataIndex: 'priority',
     width: 108,
   },
   {
-    title: '用户',
+    title: t('adminApp.columns.user'),
     key: 'user',
     width: 140,
   },
   {
-    title: '创建时间',
+    title: t('adminApp.columns.createTime'),
     dataIndex: 'createTime',
     width: 186,
   },
   {
-    title: '操作',
+    title: t('adminApp.columns.action'),
     key: 'action',
     fixed: 'right',
     width: 160,
   },
-]
+])
 
-const tableScrollX = columns.reduce(
-  (totalWidth, column) => totalWidth + (typeof column.width === 'number' ? column.width : 0),
-  0,
+const tableScrollX = computed(() =>
+  columns.value.reduce(
+    (totalWidth, column) => totalWidth + (typeof column.width === 'number' ? column.width : 0),
+    0,
+  ),
 )
 
 const loadData = async () => {
@@ -114,9 +118,9 @@ const loadData = async () => {
       return
     }
 
-    message.error(res.data.message || '获取应用列表失败')
+    message.error(res.data.message || t('adminApp.messages.loadFailed'))
   } catch {
-    message.error('获取应用列表失败，请稍后重试')
+    message.error(t('adminApp.messages.loadFailedRetry'))
   } finally {
     loading.value = false
   }
@@ -148,7 +152,7 @@ const onTableChange = (pagination: TablePaginationConfig) => {
 
 const openEditPage = (record: API.AppVO) => {
   if (!record.id) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('adminApp.messages.appIdMissing'))
     return
   }
   void router.push({ path: `/app/edit/${record.id}`, query: { admin: '1' } })
@@ -156,7 +160,7 @@ const openEditPage = (record: API.AppVO) => {
 
 const openDetailPage = (record: API.AppVO) => {
   if (!record.id) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('adminApp.messages.appIdMissing'))
     return
   }
   void router.push({ path: `/app/chat/${record.id}`, query: { admin: '1' } })
@@ -164,7 +168,7 @@ const openDetailPage = (record: API.AppVO) => {
 
 const deleteById = async (record: API.AppVO) => {
   if (!record.id) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('adminApp.messages.appIdMissing'))
     return
   }
 
@@ -172,16 +176,16 @@ const deleteById = async (record: API.AppVO) => {
   try {
     const res = await deleteAppByAdmin({ id: record.id })
     if (res.data.code === 0) {
-      message.success('删除应用成功')
+      message.success(t('adminApp.messages.deleteSuccess'))
       if ((searchParams.pageNum ?? 1) > 1 && appList.value.length === 1) {
         searchParams.pageNum = (searchParams.pageNum ?? 1) - 1
       }
       await loadData()
       return
     }
-    message.error(res.data.message || '删除应用失败')
+    message.error(res.data.message || t('adminApp.messages.deleteFailed'))
   } catch {
-    message.error('删除应用失败，请稍后重试')
+    message.error(t('adminApp.messages.deleteFailedRetry'))
   } finally {
     deletingId.value = undefined
   }
@@ -189,7 +193,7 @@ const deleteById = async (record: API.AppVO) => {
 
 const setFeatured = async (record: API.AppVO) => {
   if (!record.id) {
-    message.warning('应用 ID 不存在')
+    message.warning(t('adminApp.messages.appIdMissing'))
     return
   }
 
@@ -202,13 +206,13 @@ const setFeatured = async (record: API.AppVO) => {
       priority: 99,
     })
     if (res.data.code === 0) {
-      message.success('已设为精选（优先级 99）')
+      message.success(t('adminApp.messages.featureSuccess'))
       await loadData()
       return
     }
-    message.error(res.data.message || '设置精选失败')
+    message.error(res.data.message || t('adminApp.messages.featureFailed'))
   } catch {
-    message.error('设置精选失败，请稍后重试')
+    message.error(t('adminApp.messages.featureFailedRetry'))
   } finally {
     featuringId.value = undefined
   }
@@ -222,77 +226,77 @@ onMounted(() => {
 <template>
   <section class="app-management">
     <a-card class="query-section" :bordered="false">
-      <h2 class="section-title">查询区</h2>
+      <h2 class="section-title">{{ $t('adminApp.title.query') }}</h2>
       <a-form layout="inline" class="query-form" :model="searchParams" @finish="doSearch">
-        <a-form-item label="ID">
+        <a-form-item :label="$t('adminApp.search.idLabel')">
           <a-input
             v-model:value="searchParams.id"
             allow-clear
-            placeholder="应用 ID"
+            :placeholder="$t('adminApp.search.idPlaceholder')"
             style="width: 140px"
           />
         </a-form-item>
 
-        <a-form-item label="名称">
+        <a-form-item :label="$t('adminApp.search.nameLabel')">
           <a-input
             v-model:value="searchParams.appName"
             allow-clear
-            placeholder="应用名称"
+            :placeholder="$t('adminApp.search.namePlaceholder')"
             style="width: 180px"
           />
         </a-form-item>
 
-        <a-form-item label="生成类型">
+        <a-form-item :label="$t('adminApp.search.codeGenTypeLabel')">
           <a-select
             v-model:value="searchParams.codeGenType"
             allow-clear
             :options="codeGenTypeOptions"
-            placeholder="请选择生成类型"
+            :placeholder="$t('adminApp.search.codeGenTypePlaceholder')"
             style="width: 160px"
           />
         </a-form-item>
 
-        <a-form-item label="优先级">
+        <a-form-item :label="$t('adminApp.search.priorityLabel')">
           <a-input-number
             v-model:value="searchParams.priority"
-            placeholder="priority"
+            :placeholder="$t('adminApp.search.priorityPlaceholder')"
             style="width: 120px"
           />
         </a-form-item>
 
-        <a-form-item label="用户 ID">
+        <a-form-item :label="$t('adminApp.search.userIdLabel')">
           <a-input-number
             v-model:value="searchParams.userId"
             :min="1"
-            placeholder="userId"
+            :placeholder="$t('adminApp.search.userIdPlaceholder')"
             style="width: 120px"
           />
         </a-form-item>
 
-        <a-form-item label="排序字段">
+        <a-form-item :label="$t('adminApp.search.sortFieldLabel')">
           <a-select
             v-model:value="searchParams.sortField"
             allow-clear
             style="width: 140px"
             :options="sortFieldOptions"
-            placeholder="字段"
+            :placeholder="$t('adminApp.search.sortFieldPlaceholder')"
           />
         </a-form-item>
 
-        <a-form-item label="排序方式">
+        <a-form-item :label="$t('adminApp.search.sortOrderLabel')">
           <a-select
             v-model:value="searchParams.sortOrder"
             allow-clear
             style="width: 120px"
             :options="sortOrderOptions"
-            placeholder="方式"
+            :placeholder="$t('adminApp.search.sortOrderPlaceholder')"
           />
         </a-form-item>
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" html-type="submit">查询</a-button>
-            <a-button @click="doReset">重置</a-button>
+            <a-button type="primary" html-type="submit">{{ $t('common.actions.search') }}</a-button>
+            <a-button @click="doReset">{{ $t('common.actions.reset') }}</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -300,7 +304,7 @@ onMounted(() => {
 
     <a-card class="table-section" :bordered="false">
       <div class="section-header">
-        <h2 class="section-title">应用列表</h2>
+        <h2 class="section-title">{{ $t('adminApp.title.appList') }}</h2>
       </div>
 
       <a-table
@@ -313,7 +317,7 @@ onMounted(() => {
           pageSize: searchParams.pageSize,
           total,
           showSizeChanger: true,
-          showTotal: (count: number) => `共 ${count} 条`,
+          showTotal: (count: number) => $t('adminApp.pagination.total', { count }),
           pageSizeOptions: ['20', '50', '100', '200'],
         }"
         :scroll="{ x: tableScrollX }"
@@ -332,22 +336,22 @@ onMounted(() => {
           </template>
 
           <template v-else-if="column.dataIndex === 'deployKey'">
-            <a-tag v-if="record.deployKey?.trim()" color="success">已部署</a-tag>
-            <span v-else>未部署</span>
+            <a-tag v-if="record.deployKey?.trim()" color="success">{{ $t('adminApp.tags.deployed') }}</a-tag>
+            <span v-else>{{ $t('adminApp.tags.notDeployed') }}</span>
           </template>
 
           <template v-else-if="column.dataIndex === 'priority'">
-            <a-tag v-if="record.priority === 99" color="gold">精选</a-tag>
+            <a-tag v-if="record.priority === 99" color="gold">{{ $t('adminApp.tags.featured') }}</a-tag>
             <span v-else>{{ record.priority ?? '-' }}</span>
           </template>
 
           <template v-else-if="column.key === 'action'">
             <div class="action-group">
               <a-button class="action-button" type="link" @click="openDetailPage(record)">
-                详情
+                {{ $t('adminApp.buttons.detail') }}
               </a-button>
               <a-button class="action-button" type="link" @click="openEditPage(record)">
-                编辑
+                {{ $t('common.actions.edit') }}
               </a-button>
               <a-button
                 class="action-button"
@@ -355,12 +359,12 @@ onMounted(() => {
                 :loading="featuringId === record.id"
                 @click="setFeatured(record)"
               >
-                精选
+                {{ $t('adminApp.buttons.feature') }}
               </a-button>
               <a-popconfirm
-                title="确认删除该应用吗？"
-                ok-text="确认"
-                cancel-text="取消"
+                :title="$t('adminApp.confirm.deleteTitle')"
+                :ok-text="$t('common.actions.confirm')"
+                :cancel-text="$t('common.actions.cancel')"
                 @confirm="deleteById(record)"
               >
                 <a-button
@@ -369,7 +373,7 @@ onMounted(() => {
                   danger
                   :loading="deletingId === record.id"
                 >
-                  删除
+                  {{ $t('common.actions.delete') }}
                 </a-button>
               </a-popconfirm>
             </div>

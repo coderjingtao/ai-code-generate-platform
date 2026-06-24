@@ -1,9 +1,10 @@
 export interface GlobalMenuItem {
   key: string
-  label: string
+  /** i18n 文案 key（在 GlobalHeader 中翻译为 label 后再传给 a-menu） */
+  labelKey: string
   path: string
 }
 
 export const globalMenuItems: GlobalMenuItem[] = [
-  { key: 'home', label: '首页', path: '/' },
+  { key: 'home', labelKey: 'common.header.menuHome', path: '/' },
 ]

@@ -1,3 +1,5 @@
+import i18n from '@/locales'
+
 export const VISUAL_EDIT_SELECTED_MESSAGE = 'visual-edit:element-selected'
 
 export interface VisualEditElementInfo {
@@ -437,21 +439,27 @@ export const buildVisualEditPrompt = (
     return prompt
   }
 
+  const t = i18n.global.t
   const elementDescription = [
-    `标签：${elementInfo.tagName}`,
-    `CSS 选择器：${elementInfo.selector}`,
-    elementInfo.id ? `id：${elementInfo.id}` : '',
-    elementInfo.className ? `class：${elementInfo.className}` : '',
-    elementInfo.text ? `文本内容：${elementInfo.text}` : '',
-    `位置尺寸：x=${elementInfo.rect.x}, y=${elementInfo.rect.y}, width=${elementInfo.rect.width}, height=${elementInfo.rect.height}`,
+    t('common.visualEdit.tagName', { value: elementInfo.tagName }),
+    t('common.visualEdit.selector', { value: elementInfo.selector }),
+    elementInfo.id ? t('common.visualEdit.id', { value: elementInfo.id }) : '',
+    elementInfo.className ? t('common.visualEdit.className', { value: elementInfo.className }) : '',
+    elementInfo.text ? t('common.visualEdit.text', { value: elementInfo.text }) : '',
+    t('common.visualEdit.rect', {
+      x: elementInfo.rect.x,
+      y: elementInfo.rect.y,
+      w: elementInfo.rect.width,
+      h: elementInfo.rect.height,
+    }),
   ].filter(Boolean)
 
   return [
-    '请优先根据用户在预览页面中选中的元素进行修改。',
-    '选中元素信息：',
+    t('common.visualEdit.instruction'),
+    t('common.visualEdit.selectedInfo'),
     ...elementDescription.map((item) => `- ${item}`),
     '',
-    '用户原始需求：',
+    t('common.visualEdit.userRequirement'),
     prompt,
   ].join('\n')
 }

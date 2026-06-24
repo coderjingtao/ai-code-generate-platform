@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
@@ -20,10 +23,12 @@ const emit = defineEmits<{
   (e: 'delete', app: API.AppVO): void
 }>()
 
-const creatorName = computed(() => props.app.user?.userName?.trim() || '匿名用户')
+const creatorName = computed(
+  () => props.app.user?.userName?.trim() || t('components.appCard.anonymousUser'),
+)
 const creatorAvatar = computed(() => props.app.user?.userAvatar || '')
 const hasDeploy = computed(() => Boolean(props.app.deployKey))
-const appTitle = computed(() => props.app.appName?.trim() || '未命名应用')
+const appTitle = computed(() => props.app.appName?.trim() || t('components.appCard.untitledApp'))
 const coverUrl = computed(() => props.app.cover?.trim() || '')
 const coverFallback = computed(() => appTitle.value.slice(0, 1).toUpperCase())
 const avatarFallback = computed(() => creatorName.value.slice(0, 1).toUpperCase())
@@ -42,7 +47,7 @@ const onDelete = () => emit('delete', props.app)
       <div class="app-card__overlay">
         <div class="app-card__actions">
           <a-button type="primary" size="large" class="app-card__action" @click="onViewChat">
-            查看对话
+            {{ $t('components.appCard.viewChat') }}
           </a-button>
           <a-button
             v-if="hasDeploy"
@@ -50,7 +55,7 @@ const onDelete = () => emit('delete', props.app)
             class="app-card__action app-card__action--light"
             @click="onViewWork"
           >
-            查看作品
+            {{ $t('components.appCard.viewWork') }}
           </a-button>
         </div>
       </div>
@@ -65,14 +70,14 @@ const onDelete = () => emit('delete', props.app)
     </div>
 
     <div v-if="showManageActions" class="app-card__manage">
-      <a-button type="link" @click="onEdit">编辑</a-button>
+      <a-button type="link" @click="onEdit">{{ $t('common.actions.edit') }}</a-button>
       <a-popconfirm
-        title="确认删除该应用吗？"
-        ok-text="确认"
-        cancel-text="取消"
+        :title="$t('components.appCard.deleteConfirm')"
+        :ok-text="$t('common.actions.confirm')"
+        :cancel-text="$t('common.actions.cancel')"
         @confirm="onDelete"
       >
-        <a-button type="link" danger :loading="deleting">删除</a-button>
+        <a-button type="link" danger :loading="deleting">{{ $t('common.actions.delete') }}</a-button>
       </a-popconfirm>
     </div>
   </article>

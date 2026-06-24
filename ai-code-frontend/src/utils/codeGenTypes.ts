@@ -1,3 +1,5 @@
+import i18n from '@/locales'
+
 /**
  * 代码生成类型枚举
  */
@@ -8,34 +10,48 @@ export enum CodeGenTypeEnum {
   REACT_PROJECT = 'react_project',
 }
 
+/** 解析某个代码生成类型的本地化显示文案 */
+const typeLabel = (type: CodeGenTypeEnum): string => i18n.global.t(`common.codeGenType.${type}`)
+
 /**
- * 代码生成类型配置
+ * 代码生成类型配置（label 为响应当前语言的 getter）
  */
 export const CODE_GEN_TYPE_CONFIG = {
   [CodeGenTypeEnum.HTML]: {
-    label: '原生 HTML 模式',
+    get label() {
+      return typeLabel(CodeGenTypeEnum.HTML)
+    },
     value: CodeGenTypeEnum.HTML,
   },
   [CodeGenTypeEnum.MULTI_FILE]: {
-    label: '原生多文件模式',
+    get label() {
+      return typeLabel(CodeGenTypeEnum.MULTI_FILE)
+    },
     value: CodeGenTypeEnum.MULTI_FILE,
   },
   [CodeGenTypeEnum.VUE_PROJECT]: {
-    label: 'Vue 项目模式',
+    get label() {
+      return typeLabel(CodeGenTypeEnum.VUE_PROJECT)
+    },
     value: CodeGenTypeEnum.VUE_PROJECT,
   },
   [CodeGenTypeEnum.REACT_PROJECT]: {
-    label: 'React 项目模式',
+    get label() {
+      return typeLabel(CodeGenTypeEnum.REACT_PROJECT)
+    },
     value: CodeGenTypeEnum.REACT_PROJECT,
   },
-} as const
+}
 
 /**
- * 代码生成类型选项（用于下拉选择）
+ * 代码生成类型选项（用于下拉选择）。
+ * 用 getter 暴露 label，确保切换语言后取值即为当前语言。
  */
-export const CODE_GEN_TYPE_OPTIONS = Object.values(CODE_GEN_TYPE_CONFIG).map((config) => ({
-  label: config.label,
-  value: config.value,
+export const CODE_GEN_TYPE_OPTIONS = Object.values(CodeGenTypeEnum).map((value) => ({
+  get label() {
+    return typeLabel(value)
+  },
+  value,
 }))
 
 /**
@@ -44,10 +60,12 @@ export const CODE_GEN_TYPE_OPTIONS = Object.values(CODE_GEN_TYPE_CONFIG).map((co
  * @returns 格式化后的类型描述
  */
 export const formatCodeGenType = (type: string | undefined): string => {
-  if (!type) return '未知类型'
+  if (!type) return i18n.global.t('common.codeGenType.unknown')
 
-  const config = CODE_GEN_TYPE_CONFIG[type as CodeGenTypeEnum]
-  return config ? config.label : type
+  if (Object.values(CodeGenTypeEnum).includes(type as CodeGenTypeEnum)) {
+    return typeLabel(type as CodeGenTypeEnum)
+  }
+  return type
 }
 
 /**

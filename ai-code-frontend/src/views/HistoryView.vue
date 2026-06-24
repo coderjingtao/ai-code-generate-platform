@@ -1,7 +1,7 @@
 <template>
   <section class="page">
-    <h1 class="page__title">生成历史</h1>
-    <p class="page__description">这里将展示历史生成记录、版本对比和导出入口。</p>
+    <h1 class="page__title">{{ $t('history.title') }}</h1>
+    <p class="page__description">{{ $t('history.description') }}</p>
   </section>
 </template>
 

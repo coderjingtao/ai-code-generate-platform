@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import {
   getAppByIdForAdmin,
@@ -22,6 +23,7 @@ type WithStringId<T> = Omit<T, 'id'> & { id: string }
 const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
+const { t } = useI18n()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -45,7 +47,9 @@ const adminQueryEnabled = computed(() => {
 })
 const isAdminEdit = computed(() => adminEditMode.value)
 
-const pageTitle = computed(() => (isAdminEdit.value ? '编辑应用（管理员）' : '编辑我的作品'))
+const pageTitle = computed(() =>
+  isAdminEdit.value ? t('appEdit.title.admin') : t('appEdit.title.user'),
+)
 
 const withStringId = <T extends { id?: unknown }>(params: WithStringId<T>) => {
   return params as unknown as T
@@ -65,7 +69,7 @@ const ensureAdminEditMode = async () => {
 
 const loadAppDetail = async () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appEdit.message.invalidId'))
     await router.replace('/')
     return
   }
@@ -86,9 +90,9 @@ const loadAppDetail = async () => {
       return
     }
 
-    message.error(res.data.message || '获取应用详情失败')
+    message.error(res.data.message || t('appEdit.message.loadFailed'))
   } catch {
-    message.error('获取应用详情失败，请稍后重试')
+    message.error(t('appEdit.message.loadFailedRetry'))
   } finally {
     loading.value = false
   }
@@ -96,13 +100,13 @@ const loadAppDetail = async () => {
 
 const submitForm = async () => {
   if (!appId.value) {
-    message.error('应用 ID 不合法')
+    message.error(t('appEdit.message.invalidId'))
     return
   }
 
   const trimmedName = formState.appName.trim()
   if (!trimmedName) {
-    message.warning('请输入应用名称')
+    message.warning(t('appEdit.message.appNameRequired'))
     return
   }
 
@@ -119,12 +123,12 @@ const submitForm = async () => {
       )
 
       if (res.data.code === 0) {
-        message.success('更新应用成功')
+        message.success(t('appEdit.message.updateSuccess'))
         await loadAppDetail()
         return
       }
 
-      message.error(res.data.message || '更新应用失败')
+      message.error(res.data.message || t('appEdit.message.updateFailed'))
       return
     }
 
@@ -136,14 +140,14 @@ const submitForm = async () => {
     )
 
     if (res.data.code === 0) {
-      message.success('更新应用成功')
+      message.success(t('appEdit.message.updateSuccess'))
       await loadAppDetail()
       return
     }
 
-    message.error(res.data.message || '更新应用失败')
+    message.error(res.data.message || t('appEdit.message.updateFailed'))
   } catch {
-    message.error('更新应用失败，请稍后重试')
+    message.error(t('appEdit.message.updateFailedRetry'))
   } finally {
     submitting.value = false
   }
@@ -174,45 +178,47 @@ onMounted(() => {
       <div class="edit-card__header">
         <div>
           <h1>{{ pageTitle }}</h1>
-          <p>普通用户仅可修改应用名称；管理员可额外修改应用封面和优先级。</p>
+          <p>{{ $t('appEdit.description') }}</p>
         </div>
         <a-space>
-          <a-button @click="goBack">返回</a-button>
-          <a-button @click="goToChat">查看详情</a-button>
+          <a-button @click="goBack">{{ $t('common.actions.back') }}</a-button>
+          <a-button @click="goToChat">{{ $t('appEdit.actions.viewDetail') }}</a-button>
         </a-space>
       </div>
 
       <a-form layout="vertical" :model="formState" class="edit-form">
-        <a-form-item label="应用名称" required>
-          <a-input v-model:value="formState.appName" placeholder="请输入应用名称" />
+        <a-form-item :label="$t('appEdit.form.appName')" required>
+          <a-input v-model:value="formState.appName" :placeholder="$t('appEdit.form.appNamePlaceholder')" />
         </a-form-item>
 
-        <a-form-item v-if="isAdminEdit" label="应用封面">
-          <a-input v-model:value="formState.cover" placeholder="请输入应用封面 URL" />
+        <a-form-item v-if="isAdminEdit" :label="$t('appEdit.form.cover')">
+          <a-input v-model:value="formState.cover" :placeholder="$t('appEdit.form.coverPlaceholder')" />
         </a-form-item>
 
-        <a-form-item v-if="isAdminEdit" label="优先级">
+        <a-form-item v-if="isAdminEdit" :label="$t('appEdit.form.priority')">
           <a-input-number v-model:value="formState.priority" :min="0" style="width: 220px" />
         </a-form-item>
       </a-form>
 
-      <a-descriptions title="应用信息" bordered :column="2" size="small">
-        <a-descriptions-item label="应用 ID">{{ appInfo?.id ?? '-' }}</a-descriptions-item>
-        <a-descriptions-item label="创建者">{{
+      <a-descriptions :title="$t('appEdit.info.title')" bordered :column="2" size="small">
+        <a-descriptions-item :label="$t('appEdit.info.id')">{{ appInfo?.id ?? '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="$t('appEdit.info.creator')">{{
           appInfo?.user?.userName || '-'
         }}</a-descriptions-item>
-        <a-descriptions-item label="生成类型">{{
+        <a-descriptions-item :label="$t('appEdit.info.genType')">{{
           appInfo?.codeGenType || '-'
         }}</a-descriptions-item>
-        <a-descriptions-item label="优先级">{{ appInfo?.priority ?? '-' }}</a-descriptions-item>
-        <a-descriptions-item label="创建时间">{{ appInfo?.createTime || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="更新时间">{{ appInfo?.updateTime || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="$t('appEdit.info.priority')">{{ appInfo?.priority ?? '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="$t('appEdit.info.createTime')">{{ appInfo?.createTime || '-' }}</a-descriptions-item>
+        <a-descriptions-item :label="$t('appEdit.info.updateTime')">{{ appInfo?.updateTime || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <div class="edit-card__footer">
         <a-space>
-          <a-button @click="goBack">取消</a-button>
-          <a-button type="primary" :loading="submitting" @click="submitForm">保存</a-button>
+          <a-button @click="goBack">{{ $t('common.actions.cancel') }}</a-button>
+          <a-button type="primary" :loading="submitting" @click="submitForm">{{
+            $t('common.actions.save')
+          }}</a-button>
         </a-space>
       </div>
     </a-card>

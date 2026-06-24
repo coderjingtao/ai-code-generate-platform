@@ -2,13 +2,17 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import logoUrl from '@/assets/logo.png'
 import { userLogout } from '@/api/usersController'
 import type { GlobalMenuItem } from '@/config/navigation'
 import { useLoginUserStore } from '@/stores/loginUserStore'
+import { useLocaleStore } from '@/stores/localeStore'
 
 const loginUserStore = useLoginUserStore()
+const localeStore = useLocaleStore()
+const { t, locale } = useI18n()
 const props = defineProps<{
   menuItems: GlobalMenuItem[]
 }>()
@@ -21,6 +25,14 @@ const isAdmin = computed(() => loginUserStore.loginUser?.userRole === 'admin')
 const username = computed(() => loginUserStore.loginUser?.userName || 'User')
 const userAvatar = computed(() => loginUserStore.loginUser?.userAvatar || '')
 const isHomePage = computed(() => route.path === '/')
+
+// 把导航项的 labelKey 翻译成当前语言的 label 再交给 a-menu
+const translatedMenuItems = computed(() =>
+  props.menuItems.map((item) => ({ ...item, label: t(item.labelKey) })),
+)
+
+// 触发按钮显示「点击后将切换到的目标语言」：中文界面显示 English，反之显示 中文
+const localeLabel = computed(() => (locale.value === 'zh' ? 'English' : '中文'))
 
 const selectedKeys = computed(() => {
   const activeItem = props.menuItems.find((item) => {
@@ -67,18 +79,18 @@ const handleUserMenuClick = async ({ key }: { key: string }) => {
       const res = await userLogout()
       if (res.data.code === 0) {
         loginUserStore.setLoginUser({})
-        message.success('已退出登录')
+        message.success(t('common.header.logoutSuccess'))
         await router.replace('/')
         return
       }
-      message.error(res.data.message || '退出登录失败，请稍后重试')
+      message.error(res.data.message || t('common.header.logoutFailed'))
     } catch {
-      message.error('退出登录失败，请稍后重试')
+      message.error(t('common.header.logoutFailed'))
     }
     return
   }
 
-  message.info('该功能正在开发中')
+  message.info(t('common.header.featureInDev'))
 }
 
 const goToHome = () => {
@@ -106,10 +118,20 @@ const goToRegisterPage = () => {
         <a-menu
           mode="horizontal"
           :selected-keys="selectedKeys"
-          :items="menuItems"
+          :items="translatedMenuItems"
           @click="handleMenuClick"
         />
       </div>
+
+      <button
+        type="button"
+        class="global-header__lang-trigger"
+        :title="$t('common.header.language')"
+        @click="localeStore.toggleLocale()"
+      >
+        <span class="global-header__lang-icon">🌐</span>
+        <span class="global-header__lang-label">{{ localeLabel }}</span>
+      </button>
 
       <a-dropdown v-if="isLoggedIn" :trigger="['click']">
         <button type="button" class="global-header__user-trigger">
@@ -121,19 +143,27 @@ const goToRegisterPage = () => {
         </button>
         <template #overlay>
           <a-menu @click="handleUserMenuClick">
-            <a-menu-item key="myApps">我的作品</a-menu-item>
-            <a-menu-item v-if="isAdmin" key="appManagement">应用管理</a-menu-item>
-            <a-menu-item v-if="isAdmin" key="chatManagement">对话管理</a-menu-item>
-            <a-menu-item v-if="isAdmin" key="userManagement">用户管理</a-menu-item>
+            <a-menu-item key="myApps">{{ $t('common.header.myApps') }}</a-menu-item>
+            <a-menu-item v-if="isAdmin" key="appManagement">{{
+              $t('common.header.appManagement')
+            }}</a-menu-item>
+            <a-menu-item v-if="isAdmin" key="chatManagement">{{
+              $t('common.header.chatManagement')
+            }}</a-menu-item>
+            <a-menu-item v-if="isAdmin" key="userManagement">{{
+              $t('common.header.userManagement')
+            }}</a-menu-item>
             <a-menu-divider />
-            <a-menu-item key="logout">退出登录</a-menu-item>
+            <a-menu-item key="logout">{{ $t('common.header.logout') }}</a-menu-item>
           </a-menu>
         </template>
       </a-dropdown>
 
       <div v-else class="global-header__auth-actions">
-        <a-button type="text" @click="goToRegisterPage">注册</a-button>
-        <a-button type="primary" shape="round" @click="goToLoginPage">登录</a-button>
+        <a-button type="text" @click="goToRegisterPage">{{ $t('common.header.register') }}</a-button>
+        <a-button type="primary" shape="round" @click="goToLoginPage">{{
+          $t('common.header.login')
+        }}</a-button>
       </div>
     </div>
   </a-layout-header>
@@ -225,6 +255,35 @@ const goToRegisterPage = () => {
 .global-header__menu-wrap :deep(.ant-menu-horizontal > .ant-menu-item::after),
 .global-header__menu-wrap :deep(.ant-menu-horizontal > .ant-menu-submenu::after) {
   border-bottom: none !important;
+}
+
+.global-header__lang-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--ac-border);
+  border-radius: var(--ac-radius-pill);
+  padding: 4px 12px;
+  background: var(--ac-surface);
+  color: var(--ac-text);
+  cursor: pointer;
+  min-width: max-content;
+  font-size: 14px;
+}
+
+.global-header__lang-trigger:hover {
+  border-color: var(--ac-primary-border);
+}
+
+.global-header--home .global-header__lang-trigger {
+  border-color: var(--ac-border-inverse);
+  background: rgba(255, 248, 235, 0.1);
+  color: var(--ac-text-inverse);
+}
+
+.global-header__lang-icon {
+  font-size: 15px;
+  line-height: 1;
 }
 
 .global-header__user-trigger {

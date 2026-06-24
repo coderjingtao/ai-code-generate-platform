@@ -4,7 +4,10 @@
  * 优先级：loading > error > empty > 默认插槽内容。
  * 错误态提供「重试」按钮，通过 retry 事件向外抛出。
  */
-withDefaults(
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const props = withDefaults(
   defineProps<{
     loading?: boolean
     error?: string
@@ -19,7 +22,7 @@ withDefaults(
     error: '',
     empty: false,
     loadingText: '',
-    emptyText: '暂无数据',
+    emptyText: '',
     retryable: true,
   },
 )
@@ -27,6 +30,10 @@ withDefaults(
 defineEmits<{
   (e: 'retry'): void
 }>()
+
+const { t } = useI18n()
+// 未显式传入时回退到通用「暂无数据」文案
+const resolvedEmptyText = computed(() => props.emptyText || t('common.state.empty'))
 </script>
 
 <template>
@@ -37,10 +44,12 @@ defineEmits<{
 
   <div v-else-if="error" class="state-view state-view--error">
     <p class="state-view__text">{{ error }}</p>
-    <a-button v-if="retryable" size="small" @click="$emit('retry')">重试</a-button>
+    <a-button v-if="retryable" size="small" @click="$emit('retry')">{{
+      $t('common.actions.retry')
+    }}</a-button>
   </div>
 
-  <a-empty v-else-if="empty" :description="emptyText" />
+  <a-empty v-else-if="empty" :description="resolvedEmptyText" />
 
   <slot v-else />
 </template>

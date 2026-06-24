@@ -2,10 +2,12 @@
 import { reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 
 import { userLogin } from '@/api/usersController'
 import { useLoginUserStore } from '@/stores/loginUserStore'
 
+const { t } = useI18n()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
 const loading = ref(false)
@@ -24,13 +26,13 @@ const handleFinish = async () => {
     })
     if (res.data.code === 0 && res.data.data) {
       loginUserStore.setLoginUser(res.data.data)
-      message.success('登录成功')
+      message.success(t('login.messages.success'))
       await router.replace('/')
       return
     }
-    message.error(res.data.message || '登录失败，请检查邮箱或密码')
+    message.error(res.data.message || t('login.messages.failed'))
   } catch {
-    message.error('登录失败，请稍后重试')
+    message.error(t('login.messages.error'))
   } finally {
     loading.value = false
   }
@@ -40,7 +42,7 @@ const handleFinish = async () => {
 <template>
   <div class="user-login-view">
     <a-card class="login-card" :bordered="false">
-      <h1 class="login-title">欢迎登录</h1>
+      <h1 class="login-title">{{ $t('login.title') }}</h1>
       <p class="login-subtitle">AI Code Generation Platform</p>
       <p class="login-slogan">
         Generate entire applications without writing a single line of code.
@@ -48,36 +50,40 @@ const handleFinish = async () => {
 
       <a-form layout="vertical" :model="formState" autocomplete="off" @finish="handleFinish">
         <a-form-item
-          label="邮箱"
+          :label="$t('login.form.email')"
           name="userEmail"
           :rules="[
-            { required: true, message: '请输入邮箱' },
-            { type: 'email', message: '请输入有效的邮箱地址' }
+            { required: true, message: $t('login.rules.emailRequired') },
+            { type: 'email', message: $t('login.rules.emailInvalid') }
           ]"
         >
-          <a-input v-model:value="formState.userEmail" placeholder="请输入邮箱" size="large" />
+          <a-input
+            v-model:value="formState.userEmail"
+            :placeholder="$t('login.placeholders.email')"
+            size="large"
+          />
         </a-form-item>
 
         <a-form-item
-          label="密码"
+          :label="$t('login.form.password')"
           name="userPassword"
-          :rules="[{ required: true, message: '请输入密码' }]"
+          :rules="[{ required: true, message: $t('login.rules.passwordRequired') }]"
         >
           <a-input-password
             v-model:value="formState.userPassword"
-            placeholder="请输入密码"
+            :placeholder="$t('login.placeholders.password')"
             size="large"
           />
         </a-form-item>
 
         <div class="register-tip">
-          没有账号，
-          <RouterLink to="/user/register">去注册</RouterLink>
+          {{ $t('login.links.noAccount') }}
+          <RouterLink to="/user/register">{{ $t('login.links.goRegister') }}</RouterLink>
         </div>
 
         <a-form-item class="submit-wrap">
           <a-button type="primary" html-type="submit" size="large" block :loading="loading">
-            登录
+            {{ $t('common.header.login') }}
           </a-button>
         </a-form-item>
       </a-form>
