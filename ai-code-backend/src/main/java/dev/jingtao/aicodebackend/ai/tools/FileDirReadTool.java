@@ -43,9 +43,9 @@ public class FileDirReadTool extends BaseTool{
     @Resource
     private AppFileService appFileService;
 
-    @Tool("读取目录结构，获取指定目录下的所有文件和子目录信息")
+    @Tool("Read the directory structure, listing all files and subdirectories under the specified directory")
     public String readDir(
-            @P("目录的相对路径，为空则读取整个项目结构")
+            @P("Relative directory path; empty reads the whole project structure")
             String relativeDirPath,
             @ToolMemoryId Long appId
     ) {
@@ -54,10 +54,10 @@ public class FileDirReadTool extends BaseTool{
             Path path = appFileService.resolveSafePath(appId, CodeGenTypeEnum.VUE_PROJECT, relativeDirPath);
             File targetDir = path.toFile();
             if (!targetDir.exists() || !targetDir.isDirectory()) {
-                return "错误：目录不存在或不是目录 - " + relativeDirPath;
+                return "Error: directory does not exist or is not a directory - " + relativeDirPath;
             }
             StringBuilder structure = new StringBuilder();
-            structure.append("项目目录结构:\n");
+            structure.append("Project directory structure:\n");
             // 使用 Hutool 递归获取所有文件
             List<File> allFiles = FileUtil.loopFiles(targetDir, file -> !shouldIgnore(file.getName()));
             // 按路径深度和名称排序显示

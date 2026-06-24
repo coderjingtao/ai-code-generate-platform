@@ -21,20 +21,20 @@ public class FileReadTool extends BaseTool{
     @Resource
     private AppFileService appFileService;
 
-    @Tool("读取指定路径的文件内容")
+    @Tool("Read the content of the file at the specified path")
     public String readFile(
-            @P("文件的相对路径")
+            @P("Relative file path")
             String relativeFilePath,
             @ToolMemoryId Long appId
     ) {
         try {
             String content = appFileService.readFileContent(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath);
             if (content == null) {
-                return "错误：文件不存在或不是文件 - " + relativeFilePath;
+                return "Error: file does not exist or is not a file - " + relativeFilePath;
             }
             return content;
         } catch (Exception e) {
-            String errorMessage = "读取文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
+            String errorMessage = "Failed to read file: " + relativeFilePath + ", error: " + e.getMessage();
             log.error(errorMessage, e);
             return errorMessage;
         }

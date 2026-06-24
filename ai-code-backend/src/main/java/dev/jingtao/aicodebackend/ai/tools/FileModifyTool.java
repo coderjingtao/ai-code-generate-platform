@@ -21,33 +21,33 @@ public class FileModifyTool extends BaseTool{
     @Resource
     private AppFileService appFileService;
 
-    @Tool("修改文件内容，用新内容替换指定的旧内容")
+    @Tool("Modify file content by replacing the specified old content with new content")
     public String modifyFile(
-            @P("文件的相对路径")
+            @P("Relative file path")
             String relativeFilePath,
-            @P("要替换的旧内容")
+            @P("The old content to be replaced")
             String oldContent,
-            @P("替换后的新内容")
+            @P("The new content to replace with")
             String newContent,
             @ToolMemoryId Long appId
     ) {
         try {
             String originalContent = appFileService.readFileContent(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath);
             if (originalContent == null) {
-                return "错误：文件不存在或不是文件 - " + relativeFilePath;
+                return "Error: file does not exist or is not a file - " + relativeFilePath;
             }
             if (!originalContent.contains(oldContent)) {
-                return "警告：文件中未找到要替换的内容，文件未修改 - " + relativeFilePath;
+                return "Warning: content to replace not found in file, file not modified - " + relativeFilePath;
             }
             String modifiedContent = originalContent.replace(oldContent, newContent);
             if (originalContent.equals(modifiedContent)) {
-                return "信息：替换后文件内容未发生变化 - " + relativeFilePath;
+                return "Info: file content unchanged after replacement - " + relativeFilePath;
             }
             appFileService.writeFile(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath, modifiedContent);
             log.info("成功修改文件: appId={}, path={}", appId, relativeFilePath);
-            return "文件修改成功: " + relativeFilePath;
+            return "File modified successfully: " + relativeFilePath;
         } catch (Exception e) {
-            String errorMessage = "修改文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
+            String errorMessage = "Failed to modify file: " + relativeFilePath + ", error: " + e.getMessage();
             log.error(errorMessage, e);
             return errorMessage;
         }

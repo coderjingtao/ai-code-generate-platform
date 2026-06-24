@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 @SpringBootTest
 class AiCodeGenerateServiceTest {
 
@@ -24,14 +22,14 @@ class AiCodeGenerateServiceTest {
 
     @Test
     void generateHtmlCode() {
-        HtmlCodeResult result = aiCodeGenerateService.generateHtmlCode("做个最简单的登录页");
+        HtmlCodeResult result = aiCodeGenerateService.generateHtmlCode("做个最简单的登录页","");
         System.out.println(result);
         Assertions.assertNotNull(result);
     }
 
     @Test
     void generateMultiFileCode() {
-        MultiFileCodeResult result = aiCodeGenerateService.generateMultiFileCode("做个最简单的登录页");
+        MultiFileCodeResult result = aiCodeGenerateService.generateMultiFileCode("做个最简单的登录页","");
         System.out.println(result);
         Assertions.assertNotNull(result);
     }

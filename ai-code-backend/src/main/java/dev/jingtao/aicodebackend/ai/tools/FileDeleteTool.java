@@ -22,9 +22,9 @@ public class FileDeleteTool extends BaseTool{
     @Resource
     private AppFileService appFileService;
 
-    @Tool("删除指定路径的文件")
+    @Tool("Delete the file at the specified path")
     public String deleteFile(
-            @P("文件的相对路径")
+            @P("Relative file path")
             String relativeFilePath,
             @ToolMemoryId Long appId
     ) {
@@ -32,17 +32,17 @@ public class FileDeleteTool extends BaseTool{
             // 安全检查：避免删除重要文件（基于文件名）
             String fileName = FileUtil.getName(relativeFilePath);
             if (isImportantFile(fileName)) {
-                return "错误：不允许删除重要文件 - " + fileName;
+                return "Error: deleting important files is not allowed - " + fileName;
             }
             // 统一通过 AppFileService 删除：自带路径穿越校验与目录布局
             boolean deleted = appFileService.deleteFile(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath);
             if (!deleted) {
-                return "警告：文件不存在，无需删除 - " + relativeFilePath;
+                return "Warning: file does not exist, nothing to delete - " + relativeFilePath;
             }
             log.info("成功删除文件: appId={}, path={}", appId, relativeFilePath);
-            return "文件删除成功: " + relativeFilePath;
+            return "File deleted successfully: " + relativeFilePath;
         } catch (Exception e) {
-            String errorMessage = "删除文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
+            String errorMessage = "Failed to delete file: " + relativeFilePath + ", error: " + e.getMessage();
             log.error(errorMessage, e);
             return errorMessage;
         }

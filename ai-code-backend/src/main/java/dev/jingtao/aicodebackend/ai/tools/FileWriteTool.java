@@ -22,11 +22,11 @@ public class FileWriteTool extends BaseTool{
     @Resource
     private AppFileService appFileService;
 
-    @Tool("写入文件到指定路径")
+    @Tool("Write a file to the specified path")
     public String writeFile(
-            @P("文件相对路径")
+            @P("Relative file path")
             String relativeFilePath,
-            @P("要写入文件到内容")
+            @P("The content to write to the file")
             String content,
             @ToolMemoryId
             Long appId) {
@@ -35,9 +35,9 @@ public class FileWriteTool extends BaseTool{
             appFileService.writeFile(appId, CodeGenTypeEnum.VUE_PROJECT, relativeFilePath, content);
             log.info("成功写入文件: appId={}, path={}", appId, relativeFilePath);
             // 注意要返回相对路径，不能让 AI 把文件绝对路径返回给用户
-            return "文件写入成功: " + relativeFilePath;
+            return "File written successfully: " + relativeFilePath;
         }catch (Exception e) {
-            String errorMessage = "文件写入失败: " + relativeFilePath + ", 错误: " + e.getMessage();
+            String errorMessage = "Failed to write file: " + relativeFilePath + ", error: " + e.getMessage();
             log.error(errorMessage, e);
             return errorMessage;
         }
