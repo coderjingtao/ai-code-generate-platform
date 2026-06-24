@@ -86,14 +86,14 @@ flowchart TD
     R --> END1
 
     %% ---------- 汇聚：落盘与流式 ----------
-    J --> S[AppFileService<br/>写入 CODE_OUTPUT/{type}_{appId}/]
+    J --> S["AppFileService<br/>写入 CODE_OUTPUT/{type}_{appId}/"]
     K --> S
     END1 --> S
     S --> T[StreamHandlerExecutor<br/>收集 AI 回复并存入对话历史]
     T --> U([SSE 流式事件返回前端<br/>file_start / file_delta / file_done<br/>tool_call / build_status / preview_ready])
 
     %% ---------- 后续动作 ----------
-    U -.可选.-> V[/app/deploy<br/>构建产物部署为站点/]
+    U -.可选.-> V["/app/deploy<br/>构建产物部署为站点"]
     V -.异步.-> W[ScreenshotService<br/>Selenium 截图 → 上传 R2 → 更新封面]
 ```
 

@@ -86,14 +86,14 @@ flowchart TD
     R --> END1
 
     %% ---------- Converge: persist & stream ----------
-    J --> S[AppFileService<br/>write to CODE_OUTPUT/{type}_{appId}/]
+    J --> S["AppFileService<br/>write to CODE_OUTPUT/{type}_{appId}/"]
     K --> S
     END1 --> S
     S --> T[StreamHandlerExecutor<br/>collect AI reply, save to chat history]
     T --> U([SSE events to frontend<br/>file_start / file_delta / file_done<br/>tool_call / build_status / preview_ready])
 
     %% ---------- Follow-up ----------
-    U -.optional.-> V[/app/deploy<br/>deploy build output as a site/]
+    U -.optional.-> V["/app/deploy<br/>deploy build output as a site"]
     V -.async.-> W[ScreenshotService<br/>Selenium screenshot → upload R2 → update cover]
 ```
 
